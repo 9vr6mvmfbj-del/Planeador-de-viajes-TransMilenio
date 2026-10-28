@@ -83,6 +83,7 @@ public:
     std::vector<std::string> rutas_de(const std::string& estacion) const;
     std::vector<std::string> horarios(const std::string& estacion, const std::string& ruta) const;
     std::vector<std::string> nombres_rutas() const;
+    std::vector<std::string> estaciones_cerradas() const;  // O(n), solo para la app
     int num_estaciones() const { return estacionesExistentes_; }
     int num_estaciones_abiertas() const { return arbolNombres_.tamano(); }
     int num_rutas() const { return static_cast<int>(rutas_.size()); }

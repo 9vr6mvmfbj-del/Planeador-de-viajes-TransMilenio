@@ -1,0 +1,304 @@
+/* =============================================================================
+   Planeador TransMilenio — sistema visual
+   Base: estilo Apple / Liquid Glass de CORE I. Fuente del sistema (SF Pro en iPhone).
+   ============================================================================= */
+
+:root {
+  color-scheme: light dark;
+
+  /* superficies */
+  --fondo: #f2f2f7;
+  --fondo-2: #e9e9f0;
+  --tinta: #1d1d1f;
+  --tinta-2: #3c3c43;
+  --tenue: #6e6e73;
+  --tenue-2: #8e8e93;
+  --separador: rgba(60, 60, 67, 0.14);
+  --relleno: rgba(118, 118, 128, 0.12);
+  --relleno-2: rgba(118, 118, 128, 0.2);
+
+  /* vidrio */
+  --vidrio: rgba(255, 255, 255, 0.62);
+  --vidrio-fuerte: rgba(255, 255, 255, 0.78);
+  --vidrio-borde: rgba(255, 255, 255, 0.7);
+  --vidrio-brillo: rgba(255, 255, 255, 0.85);
+  --vidrio-sombra: 0 1px 1px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(31, 38, 60, 0.08);
+  --vidrio-sombra-alta: 0 2px 4px rgba(0, 0, 0, 0.06), 0 18px 50px rgba(31, 38, 60, 0.16);
+
+  /* color */
+  --rojo: #e3001b;          /* rojo TransMilenio */
+  --rojo-suave: rgba(227, 0, 27, 0.1);
+  --azul: #007aff;
+  --verde: #34c759;
+  --verde-suave: rgba(52, 199, 89, 0.14);
+  --naranja: #ff9500;
+  --naranja-suave: rgba(255, 149, 0, 0.14);
+  --gris-cerrada: #8e8e93;
+
+  /* movimiento (Emil Kowalski) */
+  --salida: cubic-bezier(0.23, 1, 0.32, 1);
+  --en-pantalla: cubic-bezier(0.77, 0, 0.175, 1);
+  --cajon: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* forma */
+  --radio: 22px;
+  --radio-sm: 14px;
+  --barra-alto: 64px;
+
+  font: 17px/1.4 -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #000000;
+    --fondo-2: #0e0e12;
+    --tinta: #f5f5f7;
+    --tinta-2: #d1d1d6;
+    --tenue: #98989f;
+    --tenue-2: #6e6e73;
+    --separador: rgba(84, 84, 88, 0.45);
+    --relleno: rgba(118, 118, 128, 0.24);
+    --relleno-2: rgba(118, 118, 128, 0.34);
+    --vidrio: rgba(30, 30, 34, 0.58);
+    --vidrio-fuerte: rgba(36, 36, 40, 0.78);
+    --vidrio-borde: rgba(255, 255, 255, 0.12);
+    --vidrio-brillo: rgba(255, 255, 255, 0.16);
+    --vidrio-sombra: 0 1px 1px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.45);
+    --vidrio-sombra-alta: 0 2px 6px rgba(0, 0, 0, 0.4), 0 24px 60px rgba(0, 0, 0, 0.6);
+    --rojo: #ff3b4e;
+    --rojo-suave: rgba(255, 59, 78, 0.16);
+    --azul: #0a84ff;
+    --verde: #30d158;
+    --verde-suave: rgba(48, 209, 88, 0.16);
+    --naranja: #ff9f0a;
+    --naranja-suave: rgba(255, 159, 10, 0.16);
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  background: var(--fondo);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+body {
+  min-height: 100dvh;
+  color: var(--tinta);
+  background: var(--fondo);
+  overflow-x: hidden;
+}
+
+/* Fondo con color suave detrás del vidrio: sin él, el vidrio no tiene nada que "refractar". */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -20vmax;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38vmax 38vmax at 12% 8%, rgba(227, 0, 27, 0.13), transparent 70%),
+    radial-gradient(42vmax 42vmax at 92% 18%, rgba(0, 122, 255, 0.12), transparent 70%),
+    radial-gradient(40vmax 40vmax at 70% 95%, rgba(255, 204, 0, 0.12), transparent 70%),
+    var(--fondo);
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+input, select, textarea { font-size: 16px; } /* evita el zoom de iOS al enfocar */
+
+button, a, [role='button'], .control {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+button { cursor: pointer; background: none; border: 0; }
+button:disabled { cursor: default; }
+
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--azul) 55%, transparent); outline-offset: 2px; border-radius: 10px; }
+
+/* ----------------------------------------------------------------- Liquid Glass
+   1) iOS 26 Safari: material nativo de Apple (-apple-visual-effect).
+   2) El resto: desenfoque + saturación + brillo especular en el borde superior. */
+.vidrio {
+  position: relative;
+  background: var(--vidrio);
+  -webkit-backdrop-filter: blur(28px) saturate(185%);
+  backdrop-filter: blur(28px) saturate(185%);
+  border: 0.5px solid var(--vidrio-borde);
+  box-shadow:
+    inset 0 1px 0 var(--vidrio-brillo),
+    inset 0 -0.5px 0 rgba(255, 255, 255, 0.06),
+    var(--vidrio-sombra);
+}
+/* brillo de luz que entra por arriba: hace que se lea como un material y no como un panel plano */
+.vidrio::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 42%);
+  mix-blend-mode: soft-light;
+}
+.vidrio-flotante { box-shadow: inset 0 1px 0 var(--vidrio-brillo), var(--vidrio-sombra-alta); }
+
+@supports (-apple-visual-effect: -apple-system-glass-material) {
+  .vidrio-nativo {
+    -apple-visual-effect: -apple-system-glass-material;
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .vidrio-nativo::after { display: none; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .vidrio { background: var(--vidrio-fuerte); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .vidrio { background: var(--fondo); border: 1px solid var(--tinta-2); }
+}
+
+/* ----------------------------------------------------------------- tipografía */
+.titulo-grande {
+  font-size: 34px;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+}
+.titulo { font-size: 22px; line-height: 1.15; font-weight: 700; letter-spacing: -0.016em; }
+.subtitulo { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.etiqueta {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--tenue);
+  text-transform: uppercase;
+}
+.tenue { color: var(--tenue); }
+.pequeno { font-size: 15px; }
+.mini { font-size: 13px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ----------------------------------------------------------------- tarjetas */
+.tarjeta {
+  border-radius: var(--radio);
+  padding: 18px;
+}
+.tarjeta + .tarjeta { margin-top: 14px; }
+.cabeza-tarjeta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+
+/* ----------------------------------------------------------------- botones */
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 16px;
+  background: var(--relleno);
+  color: var(--tinta);
+  transition: transform 160ms var(--salida), background-color 160ms ease, opacity 160ms ease;
+}
+.boton:active:not(:disabled) { transform: scale(0.97); }
+.boton:disabled { opacity: 0.38; }
+.boton-primario { background: var(--rojo); color: #fff; box-shadow: 0 6px 18px rgba(227, 0, 27, 0.28); }
+.boton-icono { width: 44px; padding: 0; }
+@media (hover: hover) and (pointer: fine) {
+  .boton:hover:not(:disabled) { background: var(--relleno-2); }
+  .boton-primario:hover:not(:disabled) { background: color-mix(in srgb, var(--rojo) 88%, black); }
+}
+
+/* control segmentado tipo iOS */
+.segmentado {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--relleno);
+  position: relative;
+}
+.segmentado button {
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: color 160ms ease;
+}
+.segmentado button[aria-pressed='true'] {
+  font-weight: 600;
+  background: var(--vidrio-fuerte);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* campos */
+.campo {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--relleno);
+  outline: none;
+  transition: box-shadow 160ms ease, background-color 160ms ease;
+}
+.campo:focus { background: var(--vidrio-fuerte); box-shadow: 0 0 0 3px color-mix(in srgb, var(--azul) 35%, transparent); }
+.campo::placeholder { color: var(--tenue-2); }
+
+/* chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--relleno);
+  white-space: nowrap;
+}
+
+/* insignia de estado */
+.estado { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+.estado::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.estado-abierta { color: var(--verde); background: var(--verde-suave); }
+.estado-cerrada { color: var(--tenue); background: var(--relleno); }
+.estado-no-existe { color: var(--naranja); background: var(--naranja-suave); }
+
+/* lista agrupada estilo iOS */
+.lista { list-style: none; border-radius: var(--radio-sm); overflow: hidden; }
+.lista > li { display: flex; align-items: center; gap: 12px; min-height: 50px; padding: 10px 14px; position: relative; }
+.lista > li + li::before { content: ''; position: absolute; top: 0; left: 14px; right: 0; height: 0.5px; background: var(--separador); }
+
+/* aparición escalonada (decorativa, no bloquea interacción) */
+@keyframes aparecer { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.aparece { animation: aparecer 320ms var(--salida) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+  .aparece { animation: none; }
+}
+
+.oculto-visual { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Las rejillas nunca se ensanchan por su contenido (un carrusel largo no debe abrir la página de lado). */
+.grilla, .col { grid-template-columns: minmax(0, 1fr); }
+.tarjeta, .grilla > *, .col > * { min-width: 0; }
