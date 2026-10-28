@@ -1,0 +1,8 @@
+{
+  "name": "Remix TransMilenio Bogotá — Consulta, Viajes y Operación de Red",
+  "description": "Plataforma interactiva de consulta de estaciones, planeación de viajes, mapa esquemático de troncales y operación de red de TransMilenio Bogotá.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
