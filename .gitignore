@@ -2,3 +2,4 @@ GTFS-*.zip
 __pycache__/
 *.pyc
 node_modules/
+build/
