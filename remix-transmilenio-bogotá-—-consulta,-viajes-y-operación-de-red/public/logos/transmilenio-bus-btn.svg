@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="84" viewBox="0 0 320 84">
+  <!-- Rear Coach (Red with White Details) -->
+  <rect x="8" y="12" width="126" height="50" rx="5" fill="#E30613" stroke="#FFFFFF" stroke-width="2.5"/>
+  <!-- Accordion Joint (White & Red Stripes) -->
+  <rect x="134" y="13" width="28" height="48" fill="#FFFFFF" stroke="#E30613" stroke-width="2"/>
+  <line x1="141" y1="14" x2="141" y2="60" stroke="#E30613" stroke-width="2"/>
+  <line x1="148" y1="14" x2="148" y2="60" stroke="#E30613" stroke-width="2"/>
+  <line x1="155" y1="14" x2="155" y2="60" stroke="#E30613" stroke-width="2"/>
+  <!-- Front Coach (Red with White Details) -->
+  <path d="M162,12 L296,12 Q308,12 311,26 L313,54 Q313,62 303,62 L162,62 Z" fill="#E30613" stroke="#FFFFFF" stroke-width="2.5"/>
+  <!-- White Windows Rear -->
+  <rect x="16" y="19" width="22" height="19" rx="2" fill="#FFFFFF"/>
+  <rect x="43" y="19" width="26" height="19" rx="2" fill="#FFFFFF"/>
+  <rect x="74" y="19" width="26" height="19" rx="2" fill="#FFFFFF"/>
+  <rect x="105" y="19" width="22" height="19" rx="2" fill="#FFFFFF"/>
+  <!-- White Windows Front -->
+  <rect x="170" y="19" width="28" height="19" rx="2" fill="#FFFFFF"/>
+  <rect x="203" y="19" width="28" height="19" rx="2" fill="#FFFFFF"/>
+  <rect x="236" y="19" width="28" height="19" rx="2" fill="#FFFFFF"/>
+  <path d="M270,19 L302,21 L305,42 L270,40 Z" fill="#FFFFFF"/>
+  <!-- White Horizontal Stripe -->
+  <line x1="12" y1="49" x2="130" y2="49" stroke="#FFFFFF" stroke-width="3"/>
+  <line x1="166" y1="49" x2="298" y2="49" stroke="#FFFFFF" stroke-width="3"/>
+  <!-- 3 Red & White Wheels -->
+  <circle cx="68" cy="63" r="11" fill="#E30613" stroke="#FFFFFF" stroke-width="3.5"/>
+  <circle cx="68" cy="63" r="4.5" fill="#FFFFFF"/>
+  <circle cx="196" cy="63" r="11" fill="#E30613" stroke="#FFFFFF" stroke-width="3.5"/>
+  <circle cx="196" cy="63" r="4.5" fill="#FFFFFF"/>
+  <circle cx="278" cy="63" r="11" fill="#E30613" stroke="#FFFFFF" stroke-width="3.5"/>
+  <circle cx="278" cy="63" r="4.5" fill="#FFFFFF"/>
+</svg>
