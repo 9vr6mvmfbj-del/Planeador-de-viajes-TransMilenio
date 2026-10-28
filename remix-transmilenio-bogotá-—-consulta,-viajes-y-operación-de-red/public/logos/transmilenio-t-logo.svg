@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
-  <rect x="16" y="12" width="208" height="216" rx="12" fill="#05070B" stroke="#FACC15" stroke-width="3"/>
-  <path d="M4,62 L236,26 L214,76 L4,62 Z" fill="#FFEE00" stroke="#05070B" stroke-width="2"/>
-  <ellipse cx="122" cy="126" rx="13" ry="56" transform="rotate(14 122 126)" fill="#FFEE00"/>
-  <text x="120" y="210" text-anchor="middle" font-family="'Outfit', 'Arial Narrow', sans-serif" font-weight="800" font-size="22" fill="#FFFFFF" letter-spacing="3.5">TRANSMILENIO</text>
-</svg>
