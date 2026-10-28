@@ -1,0 +1,9 @@
+{
+  "name": "planeador-transmilenio",
+  "private": true,
+  "description": "Planeador de viajes TransMilenio. Motor motor_boff (C++ → WebAssembly) + app en Svelte.",
+  "scripts": {
+    "start": "npm --prefix web install && npm --prefix web run dev -- --open",
+    "build": "npm --prefix web install && npm --prefix web run build"
+  }
+}

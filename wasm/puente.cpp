@@ -96,6 +96,7 @@ EXPORTAR const char* m_estacion(const char* n) {
 }
 EXPORTAR const char* m_horarios(const char* e, const char* r) { return devolver(lista(red->horarios(e, r))); }
 EXPORTAR const char* m_rutas() { return devolver(lista(red->nombres_rutas())); }
+EXPORTAR const char* m_cerradas() { return devolver(lista(red->estaciones_cerradas())); }
 
 // R10: 'llegadas' es un arreglo de enteros de 32 bits escrito por JavaScript en la memoria.
 EXPORTAR const char* m_simular_fila(const int* llegadas, int n, int frecuencia, int capacidad) {

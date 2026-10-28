@@ -1,0 +1,13 @@
+{
+  "name": "Planeador TransMilenio",
+  "short_name": "TransMi",
+  "description": "Planeador de viajes TransMilenio con el motor motor_boff.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#f2f2f7",
+  "icons": [
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

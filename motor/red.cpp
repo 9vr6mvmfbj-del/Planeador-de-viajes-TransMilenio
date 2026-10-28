@@ -575,4 +575,12 @@ std::vector<std::string> Red::nombres_rutas() const {
     return res;
 }
 
+std::vector<std::string> Red::estaciones_cerradas() const {
+    std::vector<std::string> res;
+    for (const Estacion& e : estaciones_)
+        if (e.existe && !e.abierta) res.push_back(e.nombre);
+    ordenarTexto(res);
+    return res;
+}
+
 }  // namespace motor

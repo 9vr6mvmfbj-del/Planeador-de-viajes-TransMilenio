@@ -6,12 +6,38 @@ Planeador de viajes con la red real de TransMilenio (GTFS de julio de 2021).
 | Pieza | Dónde | Lenguaje |
 |---|---|---|
 | Motor (R1–R10) | `motor/` | C++17, todas las estructuras hechas a mano |
-| Puente a la web | `wasm/puente.cpp` → `web/public/motor.wasm` | C++ compilado a WebAssembly |
-| App web | `web/` | Svelte + JavaScript *(en construcción)* |
+| Puente a la web | `wasm/puente.cpp` → `web/public/motor_boff.wasm` | C++ compilado a WebAssembly |
+| App web | `web/` | Svelte 5 + JavaScript (stack de CORE I) |
 | Conversión GTFS → CSV | `conversion/` | Python |
 | Datos | `datos/` | `estaciones.csv`, `rutas.csv`, `horarios.csv` |
 
-## Cómo correrlo
+## Arrancar la app (un solo comando)
+
+```bash
+npm start
+```
+
+Instala lo necesario, copia los CSV de `datos/` y abre la app en el navegador. Para verla en el
+iPhone: misma red wifi y abrir la dirección "Network" que muestra la terminal (ej. `http://192.168.x.x:5173`).
+En Safari → Compartir → **Agregar a inicio** queda como app (pantalla completa, ícono propio).
+
+La app solo llama al motor **motor_boff** (el C++ de `motor/` compilado a WebAssembly); no calcula
+nada de los requisitos por su cuenta:
+
+| Pestaña | Requisitos |
+|---|---|
+| Viajar | R5 viaje, R2 autocompletar, R4 próximo bus de cada tramo |
+| Estaciones | R1 estado, R2, R3 rango, R4 próximo bus y horarios, R6 ranking |
+| Operar | R7 editar rutas y recorrido, R8 cerrar/reabrir, R9 deshacer/rehacer |
+| Fila | R10 simular_fila (hasta 800.000 pasajeros) |
+| Rendimiento | R11 panel: n, 2n… 16n por operación, con la curva esperada |
+
+Diseño: estilo Apple de CORE I con Liquid Glass (material nativo de iOS 26 Safari con
+`-apple-visual-effect`, y desenfoque + brillo en los demás navegadores), modo claro/oscuro,
+barra de pestañas flotante en el celular y barra lateral en escritorio, áreas seguras del iPhone,
+sin zoom al escribir y animaciones con las curvas de Emil Kowalski (respetan "reducir movimiento").
+
+## Comandos del motor
 
 ```bash
 make pruebas       # 502 pruebas: casos borde de R1–R10 y R5 contra fuerza bruta en la red real
@@ -30,7 +56,7 @@ red.viaje("PORTAL NORTE", "PORTAL SUR");      // tramos, transbordo y paradas
 motor::simular_fila(llegadas, 4, 150);
 ```
 
-Desde JavaScript (la app) es igual: `red.estado(...)`, `red.proximo_bus(...)`, etc. (`web/src/lib/motor.js`).
+Desde JavaScript (la app) es igual: `red.estado(...)`, `red.proximo_bus(...)`, etc. (`web/src/lib/motor_boff.js`).
 
 ---
 
