@@ -1,0 +1,17 @@
+{
+  "name": "planeador-transmilenio-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "datos": "node scripts/copiar-datos.js",
+    "dev": "npm run datos && vite --host",
+    "build": "npm run datos && vite build",
+    "preview": "vite preview --host"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "svelte": "^5.56.8",
+    "vite": "^8.2.0"
+  }
+}

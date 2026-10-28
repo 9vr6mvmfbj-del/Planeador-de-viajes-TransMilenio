@@ -116,6 +116,7 @@ export async function cargarMotor(origen) {
     estacion: (nombre) => llamar(m.m_estacion, nombre),
     horarios: (estacion, ruta) => llamar(m.m_horarios, estacion, ruta),
     rutas: () => leer(m.m_rutas()),
+    cerradas: () => leer(m.m_cerradas()),
     rendimiento: (maxEscala = 8, consultas = 20000) => leer(m.m_rendimiento(maxEscala, consultas)),
   };
 }
