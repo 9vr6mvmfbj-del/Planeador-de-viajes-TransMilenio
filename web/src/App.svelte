@@ -3,6 +3,7 @@
   import { app, iniciar } from './lib/estado.svelte.js';
   import Navegacion from './componentes/Navegacion.svelte';
   import Avisos from './componentes/Avisos.svelte';
+  import Intro from './componentes/Intro.svelte';
   import Viajar from './vistas/Viajar.svelte';
   import Estaciones from './vistas/Estaciones.svelte';
   import Operar from './vistas/Operar.svelte';
@@ -10,6 +11,9 @@
   import Rendimiento from './vistas/Rendimiento.svelte';
 
   onMount(iniciar);
+
+  // Pantalla de entrada: se muestra al abrir la app (el motor carga mientras tanto).
+  let intro = $state(true);
 
   // Al cambiar de pestaña se vuelve arriba, como en una app nativa.
   let anterior = app.vista;
@@ -20,6 +24,8 @@
     }
   });
 </script>
+
+{#if intro}<Intro onentrar={() => (intro = false)} />{/if}
 
 <div class="borde-superior" aria-hidden="true"></div>
 
