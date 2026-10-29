@@ -33,8 +33,8 @@
 
   const K = 1.32;        // ancho de la lente levantada, en pestañas
   const EXT = 6;         // cuánto sobresale arriba y abajo (px)
-  const AUMENTO = 0.18;  // la lupa agranda 18%
-  const REFRACCION = 15; // desplazamiento máximo en el borde (px)
+  const AUMENTO = 0.06;  // el centro casi no se agranda: es vidrio, no lupa
+  const REFRACCION = 11; // cuánto se estira el contenido en el borde (px)
 
   let barra = $state(/** @type {HTMLElement | null} */ (null));
   let cristal = $state(/** @type {HTMLElement | null} */ (null));
@@ -119,15 +119,16 @@
     if (feImagen) { feImagen.setAttribute('width', String(W)); feImagen.setAttribute('height', String(H)); }
     const r = REFRACCION * p01;
     feR?.setAttribute('scale', String(r));
-    feG?.setAttribute('scale', String(r * 1.2));
-    feB?.setAttribute('scale', String(r * 1.4));
+    feG?.setAttribute('scale', String(r * 1.1));
+    feB?.setAttribute('scale', String(r * 1.2));
     const lev = p > 0.02;
     if (lev !== levantada) levantada = lev;
   }
 
-  // Mapa de desplazamiento con refracción real (ley de Snell, vidrio n = 1,5) sobre un bisel convexo
-  // tipo "squircle": el centro es plano (solo agranda) y el borde dobla la luz hacia afuera, así que
-  // ahí se ve comprimido el contenido que está más allá de la lente. R = desplazamiento en x, G en y.
+  // Mapa de desplazamiento del vidrio. Como en iOS (y en el shader de liquid-glass-react), en el borde
+  // la luz se dobla hacia el centro: cada punto del bisel muestra lo que está un poco más adentro, así
+  // que el contenido se ESTIRA hacia el borde (no se encoge) y el centro queda limpio, sin deformar.
+  // R = desplazamiento en x, G en y (128 = nada). Fuera de la cápsula se sigue estirando al máximo.
   function generarMapa(w, h) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
@@ -136,35 +137,21 @@
     const img = g.createImageData(w, h);
     const d = img.data;
     const r = h / 2;
-    const bisel = r * 0.62;
-    const perfil = (x) => Math.pow(1 - Math.pow(1 - x, 4), 0.25);
-    // magnitud del desvío a lo largo del bisel (x: 0 borde → 1 interior)
-    const muestras = 128, mag = new Float32Array(muestras + 1);
-    let max = 0;
-    for (let i = 0; i <= muestras; i++) {
-      const x = Math.max(0.0005, i / muestras);
-      const dl = 0.001;
-      const pend = (perfil(Math.min(1, x + dl)) - perfil(Math.max(0, x - dl))) / (2 * dl);
-      const alfa = Math.atan(pend);                 // ángulo de la normal
-      const beta = Math.asin(Math.sin(alfa) / 1.5); // ángulo refractado
-      const desvio = Math.tan(alfa - beta) * (0.35 + perfil(x)); // espesor: base + altura del bisel
-      mag[i] = i === muestras ? 0 : desvio;
-      if (mag[i] > max) max = mag[i];
-    }
+    const bisel = r * 0.72; // franja del borde que dobla la luz
     for (let yy = 0; yy < h; yy++) {
       for (let xx = 0; xx < w; xx++) {
         const px = xx + 0.5, py = yy + 0.5;
         const ccx = Math.min(Math.max(px, r), w - r);
         const dx = px - ccx, dy = py - r;
         const dist = Math.hypot(dx, dy);
-        const prof = r - dist;
-        let v = 0;
-        if (prof <= 0) v = 1;
-        else if (prof < bisel) v = mag[Math.round((prof / bisel) * muestras)] / max;
+        const prof = r - dist; // distancia al borde, hacia adentro
+        let t = prof <= 0 ? 1 : Math.max(0, 1 - prof / bisel);
+        t = t * t * (3 - 2 * t); // suave al entrar al bisel, fuerte en el borde
+        t = t * t;
         const nx = dist ? dx / dist : 0, ny = dist ? dy / dist : 0;
         const i = (yy * w + xx) * 4;
-        d[i] = 128 + nx * v * 127;
-        d[i + 1] = 128 + ny * v * 127;
+        d[i] = 128 - nx * t * 127;     // muestrea hacia el centro
+        d[i + 1] = 128 - ny * t * 0.3 * 127; // arriba y abajo casi no deforma (el contenido está al medio)
         d[i + 2] = 128;
         d[i + 3] = 255;
       }
