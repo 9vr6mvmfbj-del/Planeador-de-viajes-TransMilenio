@@ -121,7 +121,7 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(85% 42% at 50% 40%, rgba(205, 0, 27, 0.95) 30%, rgba(205, 0, 27, 0.6) 68%, rgba(205, 0, 27, 0.12)),
+      radial-gradient(85% 42% at 50% 44%, rgba(205, 0, 27, 0.95) 30%, rgba(205, 0, 27, 0.6) 68%, rgba(205, 0, 27, 0.12)),
       linear-gradient(180deg, transparent 52%, rgba(150, 0, 18, 0.85) 70%, #8e0012 80%);
   }
 
@@ -144,8 +144,10 @@
   /* contenido */
   .centro {
     position: absolute; left: 0; right: 0;
-    top: calc(env(safe-area-inset-top, 0px) + max(64px, 14vh));
-    display: grid; justify-items: center; text-align: center; gap: 14px; padding: 0 28px;
+    /* centrado en el espacio libre entre el borde superior y la vía de los buses */
+    top: env(safe-area-inset-top, 0px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); /* donde empieza a verse la vía */
+    display: grid; justify-items: center; align-content: center; text-align: center; gap: 14px; padding: 0 28px;
   }
   .logo {
     width: 80px; height: 80px; border-radius: 23px; background: #fff; color: #e3001b;
@@ -169,7 +171,7 @@
   /* escritorio: más aire y título más grande */
   @media (min-width: 980px) {
     h1 { font-size: 64px; }
-    .centro { top: 16vh; }
+    .centro { bottom: 260px; }
     .via { height: 300px; }
   }
   @media (prefers-reduced-motion: reduce) {
