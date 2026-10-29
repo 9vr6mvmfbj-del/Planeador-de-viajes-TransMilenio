@@ -11,6 +11,8 @@ Planeador de viajes con la red real de TransMilenio (GTFS de julio de 2021).
 | Conversión GTFS → CSV | `conversion/` | Python |
 | Datos | `datos/` | `estaciones.csv`, `rutas.csv`, `horarios.csv` |
 
+**App publicada:** https://planeador-transmilenio.netlify.app
+
 ## Arrancar la app (un solo comando)
 
 ```bash
