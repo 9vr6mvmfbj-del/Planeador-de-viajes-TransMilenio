@@ -1,7 +1,10 @@
 <script>
-  // Campo con autocompletar (R2): cada letra le pregunta al motor las estaciones abiertas que empiezan así.
+  // Campo con autocompletar: primero lo que responde el motor (R2, nombres que empiezan así) y después
+  // las estaciones donde alguna palabra coincide ("100" → CALLE 100), con lo escrito resaltado.
   import { app, motor } from '../lib/estado.svelte.js';
   import Icono from './Icono.svelte';
+  import Resaltado from './Resaltado.svelte';
+  import { buscar, normalizar } from '../lib/busqueda.js';
 
   let {
     valor = $bindable(''),
@@ -19,16 +22,29 @@
   /** @type {HTMLInputElement | undefined} */
   let entrada = $state();
 
+  const MAX = 8;
+  // Todas las estaciones abiertas (R3 en orden) y las cerradas, para buscar por palabra.
+  let abiertas = $derived.by(() => { app.version; return motor().rango('', '~'); });
+
+  let consulta = $derived(normalizar(valor));
   let sugerencias = $derived.by(() => {
     app.version; // se recalcula si la red cambia (cierres, estaciones nuevas)
-    const t = valor.trim().toUpperCase();
-    const abiertas = motor().autocompletar(t, 8).map((n) => ({ n, cerrada: false }));
-    if (!incluirCerradas) return abiertas;
-    const cerradas = motor().cerradas().filter((n) => n.startsWith(t)).slice(0, 4).map((n) => ({ n, cerrada: true }));
-    return [...cerradas, ...abiertas].slice(0, 9);
+    const t = consulta;
+    if (!t) return motor().autocompletar('', MAX).map((n) => ({ n, cerrada: false }));
+    // 1) R2: abiertas que empiezan con lo escrito. 2) el resto de coincidencias por palabra.
+    const lista = motor().autocompletar(t, MAX).map((n) => ({ n, cerrada: false }));
+    if (lista.length < MAX) {
+      const ya = new Set(lista.map((s) => s.n));
+      for (const n of buscar(abiertas, t, MAX + lista.length)) {
+        if (!ya.has(n) && lista.length < MAX) lista.push({ n, cerrada: false });
+      }
+    }
+    if (!incluirCerradas) return lista;
+    const cerradas = buscar(motor().cerradas(), t, 4).map((n) => ({ n, cerrada: true }));
+    return [...cerradas, ...lista].slice(0, MAX + 1);
   });
   $effect(() => { if (autofoco) entrada?.focus(); });
-  let exacta = $derived(sugerencias.some((s) => s.n === valor.trim().toUpperCase()));
+  let exacta = $derived(sugerencias.some((s) => s.n === consulta));
 
   function elegir(n) {
     valor = n;
@@ -88,7 +104,7 @@
         <li role="option" aria-selected={i === activo}>
           <button class:activo={i === activo} onpointerdown={(e) => { e.preventDefault(); elegir(s.n); }}>
             <span class="pin" class:cerrada={s.cerrada}></span>
-            <span class="nombre">{s.n}</span>
+            <span class="nombre"><Resaltado texto={s.n} {consulta} /></span>
             {#if s.cerrada}<span class="estado estado-cerrada">Cerrada</span>{/if}
           </button>
         </li>
@@ -124,6 +140,7 @@
     right: 0;
     list-style: none;
     padding: 6px;
+    background: var(--vidrio-fuerte); /* más opaca que el vidrio normal: se lee bien sobre lo que tapa */
     border-radius: 18px;
     max-height: 320px;
     overflow: auto;
