@@ -6,6 +6,7 @@
   import ChipRuta from '../componentes/ChipRuta.svelte';
   import LineaRuta from '../componentes/LineaRuta.svelte';
   import Icono from '../componentes/Icono.svelte';
+  import { buscar, normalizar } from '../lib/busqueda.js';
 
   // Etiquetas de lo que se hizo, solo para mostrar el historial (el motor guarda las operaciones reales).
   let hechos = $state(/** @type {string[]} */ ([]));
@@ -54,8 +55,8 @@
   let textoNueva = $state('');
 
   let rutasFiltradas = $derived.by(() => {
-    const f = filtroRuta.trim().toUpperCase();
-    return (f ? app.rutas.filter((r) => r.startsWith(f)) : app.rutas).slice(0, 40);
+    // por código completo o parte de él: "86" encuentra K86, "B7" encuentra B7 y B72
+    return filtroRuta.trim() ? buscar(app.rutas, filtroRuta, 40) : app.rutas.slice(0, 40);
   });
   let recorrido = $derived.by(() => { app.version; return ruta ? motor().recorrido(ruta, alReves) : []; });
   let cerradasSet = $derived(new Set(cerradas));
@@ -137,10 +138,10 @@
   <section class="vidrio tarjeta">
     <p class="etiqueta">Rutas</p>
     <h2 class="titulo">Editar recorrido</h2>
-    <input class="campo espacio" placeholder="Filtrar rutas, ej. B7" bind:value={filtroRuta} autocapitalize="characters" aria-label="Filtrar rutas" />
+    <input class="campo espacio" placeholder="Buscar ruta, ej. B7 o 86" bind:value={filtroRuta} autocapitalize="characters" aria-label="Filtrar rutas" />
     <div class="carrusel" role="group" aria-label="Rutas">
       {#each rutasFiltradas as r (r)}
-        <button class="ruta-boton" aria-pressed={r === ruta} onclick={() => elegirRuta(r)}><ChipRuta ruta={r} /></button>
+        <button class="ruta-boton" aria-pressed={r === ruta} onclick={() => elegirRuta(r)}><ChipRuta ruta={r} consulta={normalizar(filtroRuta)} /></button>
       {/each}
     </div>
 
