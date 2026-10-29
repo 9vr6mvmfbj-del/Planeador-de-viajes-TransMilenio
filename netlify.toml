@@ -1,0 +1,14 @@
+# Despliegue en Netlify: compila la app de web/ y publica web/dist.
+# El motor ya va compilado (web/public/motor_boff.wasm), así que Netlify no necesita C++.
+[build]
+  base = "web"
+  command = "npm install && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[headers]]
+  for = "/*.wasm"
+  [headers.values]
+    Content-Type = "application/wasm"
