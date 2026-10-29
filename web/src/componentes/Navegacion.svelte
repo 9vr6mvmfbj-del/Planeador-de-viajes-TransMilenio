@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { app, vibrar } from '../lib/estado.svelte.js';
   import Icono from './Icono.svelte';
 
@@ -10,7 +11,7 @@
     { id: 'rendimiento', texto: 'Rendimiento', icono: 'rendimiento' },
   ];
   const N = pestanas.length;
-  const PAD = 4; // relleno de la barra (px)
+  const PAD = 4; // relleno interno de la barra (px)
 
   let indice = $derived(pestanas.findIndex((p) => p.id === app.vista));
 
@@ -20,42 +21,113 @@
     app.vista = id;
   }
 
-  // ---------------------------------------------------------------- lente de vidrio arrastrable
-  // Se puede arrastrar con el dedo y soltar sobre otra pestaña (como la barra de iOS 26/27).
-  //  - al tocar: la lente "se levanta" (crece y se vuelve transparente);
-  //  - al arrastrar: sigue al dedo, se estira según la velocidad y tiene resistencia en los bordes;
-  //  - al soltar: se acomoda con un rebote en la pestaña más cercana y cambia de vista.
+  // =============================================================== lente de Liquid Glass
+  // Réplica de la barra de pestañas de iOS 26/27:
+  //  · en reposo es una cápsula gris bajo la pestaña activa;
+  //  · al tocarla "se levanta": crece (~1,6 pestañas), sobresale de la barra, se vuelve vidrio
+  //    transparente que agranda lo que tiene debajo y dobla el contenido en el borde (refracción);
+  //  · se arrastra con el dedo, se estira con la velocidad y tiene resistencia en los bordes;
+  //  · al soltar proyecta hacia dónde iba, cae en esa pestaña y vuelve a ser cápsula con un rebote.
+  // Todo se mueve con resortes (física), no con transiciones CSS: así arranca siempre desde donde
+  // está, hereda la velocidad del dedo y se puede agarrar a mitad de camino.
+
+  const K = 1.6;         // ancho de la lente levantada, en pestañas
+  const EXT = 7;         // cuánto sobresale arriba y abajo (px)
+  const AUMENTO = 0.18;  // la lupa agranda 18%
+  const REFRACCION = 15; // desplazamiento máximo en el borde (px)
+
   let barra = $state(/** @type {HTMLElement | null} */ (null));
-  let ancho = $state(0);
-  let presionada = $state(false);
-  let arrastrando = $state(false);
-  let px = $state(/** @type {number | null} */ (null)); // posición de la lente mientras se toca
-  let velocidad = $state(0);
-
-  let alto = $state(0);
-  let anchoPestana = $derived(ancho ? (ancho - PAD * 2) / N : 0);
-  let maximo = $derived(anchoPestana * (N - 1));
-  let x = $derived(px !== null ? px : indice * anchoPestana); // izquierda de la pestaña bajo la lente
-
-  // Al tocar, la lente crece (como la de iOS): ~1,6 pestañas de ancho, sobresale de la barra y
-  // agranda lo que tiene debajo. Todo se calcula en px dentro del interior de la barra.
-  const K = 1.62;   // ancho de la lente levantada, en pestañas
-  const EXT = 9;    // cuánto sobresale arriba y abajo (px)
-  const MAG = 1.3;  // aumento del contenido
-  let extra = $derived(presionada ? (K - 1) * anchoPestana : 0);
-  let anchoLente = $derived(anchoPestana + extra);
-  let altoLente = $derived(Math.max(0, alto - PAD * 2) + (presionada ? EXT * 2 : 0));
-  let izq = $derived(Math.max(-2, Math.min(ancho - PAD * 2 - anchoLente + 2, x - extra / 2)));
-
-  // Estiramiento por velocidad (squash & stretch), sin pasar del 18%.
-  let estira = $derived(Math.min(Math.abs(velocidad) * 0.09, 0.18));
-  let escala = $derived(1 + estira);
-  let escalaY = $derived(1 - estira * 0.55);
-
-  // Mapa de desplazamiento de la refracción: en el borde de la cápsula el contenido se empuja hacia
-  // afuera (más fuerte justo en el borde y cada vez menos hacia el centro). Se dibuja una vez en un
-  // canvas y el filtro SVG lo usa para doblar y separar los colores (aberración cromática).
+  let cristal = $state(/** @type {HTMLElement | null} */ (null));
+  let feImagen = $state(/** @type {SVGElement | null} */ (null));
+  let feR = $state(/** @type {SVGElement | null} */ (null));
+  let feG = $state(/** @type {SVGElement | null} */ (null));
+  let feB = $state(/** @type {SVGElement | null} */ (null));
   let mapa = $state('');
+  let levantada = $state(false); // solo para la clase que aplica el filtro
+
+  // medidas
+  let ancho = 0, alto = 0, interiorW = 0, interiorH = 0, tw = 0;
+
+  // resortes: valor, velocidad, objetivo
+  const cx = { v: 0, vel: 0, obj: 0 }; // centro de la lente (px, dentro del interior)
+  const pr = { v: 0, vel: 0, obj: 0 }; // cuánto está levantada (0 cápsula → 1 lente)
+  const st = { v: 0, vel: 0, obj: 0 }; // estiramiento por velocidad
+
+  const reducido = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // respuesta (s) y amortiguación (1 = sin rebote), como los resortes de SwiftUI
+  const RES = {
+    seguir: { r: 0.07, z: 1 },                     // sigue al dedo casi pegado
+    soltar: { r: 0.42, z: reducido ? 1 : 0.72 },   // cae en la pestaña con un rebote corto
+    levantar: { r: 0.3, z: reducido ? 1 : 0.58 },  // "pop" al tocar
+    bajar: { r: 0.36, z: reducido ? 1 : 0.8 },
+    estirar: { r: 0.12, z: 1 },
+  };
+  let resCx = RES.soltar, resPr = RES.bajar;
+
+  function paso(s, res, dt) {
+    const k = (2 * Math.PI / res.r) ** 2;
+    const c = (4 * Math.PI * res.z) / res.r;
+    const a = -k * (s.v - s.obj) - c * s.vel;
+    s.vel += a * dt;
+    s.v += s.vel * dt;
+  }
+  const quieto = (s) => Math.abs(s.v - s.obj) < 0.01 && Math.abs(s.vel) < 0.01;
+
+  let cuadro = 0, antes = 0;
+  function animar() {
+    if (!cuadro) { antes = performance.now(); cuadro = requestAnimationFrame(bucle); }
+  }
+  function bucle(t) {
+    const dt = Math.min(0.032, Math.max(0, (t - antes) / 1000));
+    antes = t;
+    const sub = 4;
+    for (let i = 0; i < sub; i++) {
+      paso(cx, resCx, dt / sub);
+      paso(pr, resPr, dt / sub);
+      st.obj = reducido ? 0 : Math.min(0.2, Math.abs(cx.vel) / 4200);
+      paso(st, RES.estirar, dt / sub);
+    }
+    pintar();
+    if (toque || !(quieto(cx) && quieto(pr) && quieto(st))) cuadro = requestAnimationFrame(bucle);
+    else { cuadro = 0; pintar(); }
+  }
+
+  // Escribe las variables CSS y el filtro de un cuadro (directo al DOM, 60 veces por segundo).
+  function pintar() {
+    if (!barra || !tw) return;
+    const p = pr.v;                       // puede pasar de 1 por el rebote: da el "pop"
+    const p01 = Math.max(0, Math.min(1, p));
+    const W = tw * (1 + (K - 1) * p);
+    const H = interiorH + 2 * EXT * p;
+    const L = cx.v - W / 2;
+    const m = 1 + AUMENTO * p;
+    const sx = 1 + st.v, sy = 1 - st.v * 0.5;
+    const s = barra.style;
+    s.setProperty('--L', L + 'px');
+    s.setProperty('--W', W + 'px');
+    s.setProperty('--H', H + 'px');
+    s.setProperty('--T', (interiorH - H) / 2 + 'px');
+    s.setProperty('--ox', cx.v + 'px');
+    s.setProperty('--m', String(m));
+    s.setProperty('--sx', String(sx));
+    s.setProperty('--sy', String(sy));
+    s.setProperty('--p', String(p01));
+    s.setProperty('--hl', PAD + L + 'px');
+    s.setProperty('--hr', PAD + L + W + 'px');
+    if (cristal) cristal.style.transform = `scale(${1 + 0.035 * p}, ${1 + 0.06 * p})`;
+    // la refracción "se materializa": crece con la lente
+    if (feImagen) { feImagen.setAttribute('width', String(W)); feImagen.setAttribute('height', String(H)); }
+    const r = REFRACCION * p01;
+    feR?.setAttribute('scale', String(r));
+    feG?.setAttribute('scale', String(r * 1.2));
+    feB?.setAttribute('scale', String(r * 1.4));
+    const lev = p > 0.02;
+    if (lev !== levantada) levantada = lev;
+  }
+
+  // Mapa de desplazamiento con refracción real (ley de Snell, vidrio n = 1,5) sobre un bisel convexo
+  // tipo "squircle": el centro es plano (solo agranda) y el borde dobla la luz hacia afuera, así que
+  // ahí se ve comprimido el contenido que está más allá de la lente. R = desplazamiento en x, G en y.
   function generarMapa(w, h) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
@@ -63,19 +135,36 @@
     if (!g) return '';
     const img = g.createImageData(w, h);
     const d = img.data;
-    const r = h / 2, bisel = r * 0.55;
+    const r = h / 2;
+    const bisel = r * 0.62;
+    const perfil = (x) => Math.pow(1 - Math.pow(1 - x, 4), 0.25);
+    // magnitud del desvío a lo largo del bisel (x: 0 borde → 1 interior)
+    const muestras = 128, mag = new Float32Array(muestras + 1);
+    let max = 0;
+    for (let i = 0; i <= muestras; i++) {
+      const x = Math.max(0.0005, i / muestras);
+      const dl = 0.001;
+      const pend = (perfil(Math.min(1, x + dl)) - perfil(Math.max(0, x - dl))) / (2 * dl);
+      const alfa = Math.atan(pend);                 // ángulo de la normal
+      const beta = Math.asin(Math.sin(alfa) / 1.5); // ángulo refractado
+      const desvio = Math.tan(alfa - beta) * (0.35 + perfil(x)); // espesor: base + altura del bisel
+      mag[i] = i === muestras ? 0 : desvio;
+      if (mag[i] > max) max = mag[i];
+    }
     for (let yy = 0; yy < h; yy++) {
       for (let xx = 0; xx < w; xx++) {
-        const cx = Math.min(Math.max(xx + 0.5, r), w - r);
-        const dx = xx + 0.5 - cx, dy = yy + 0.5 - r;
+        const px = xx + 0.5, py = yy + 0.5;
+        const ccx = Math.min(Math.max(px, r), w - r);
+        const dx = px - ccx, dy = py - r;
         const dist = Math.hypot(dx, dy);
-        const prof = r - dist; // distancia al borde, hacia adentro
-        let t = prof <= 0 ? 1 : Math.max(0, 1 - prof / bisel);
-        t = t * t * t;       // cae rápido hacia el centro: el medio queda sin deformar
+        const prof = r - dist;
+        let v = 0;
+        if (prof <= 0) v = 1;
+        else if (prof < bisel) v = mag[Math.round((prof / bisel) * muestras)] / max;
         const nx = dist ? dx / dist : 0, ny = dist ? dy / dist : 0;
         const i = (yy * w + xx) * 4;
-        d[i] = 128 + nx * t * 127;
-        d[i + 1] = 128 + ny * t * 127;
+        d[i] = 128 + nx * v * 127;
+        d[i + 1] = 128 + ny * v * 127;
         d[i + 2] = 128;
         d[i + 3] = 255;
       }
@@ -83,76 +172,116 @@
     g.putImageData(img, 0, 0);
     return c.toDataURL('image/png');
   }
-  $effect(() => {
-    if (!anchoPestana || !alto) return;
-    mapa = generarMapa(Math.round(K * anchoPestana * 2), Math.round((alto - PAD * 2 + EXT * 2) * 2));
+
+  function medir() {
+    if (!barra) return;
+    ancho = barra.clientWidth;
+    alto = barra.clientHeight;
+    if (!ancho) return;
+    interiorW = ancho - PAD * 2;
+    interiorH = alto - PAD * 2;
+    tw = interiorW / N;
+    barra.style.setProperty('--w', interiorW + 'px');
+    barra.style.setProperty('--ih', interiorH + 'px');
+    mapa = generarMapa(Math.round(tw * K * 2), Math.round((interiorH + EXT * 2) * 2));
+    if (!toque) { cx.v = cx.obj = (indice + 0.5) * tw; cx.vel = 0; }
+    pintar();
+  }
+
+  onMount(() => {
+    medir();
+    const ro = new ResizeObserver(medir);
+    if (barra) ro.observe(barra);
+    return () => { ro.disconnect(); cancelAnimationFrame(cuadro); };
   });
 
-  /** @type {{ id: number, desfase: number, x0: number, t: number, ultimoX: number, ultimoT: number, indicePrevio: number } | null} */
+  // Si la vista cambia por otro lado (teclado, código), la lente viaja hasta allá.
+  $effect(() => {
+    const i = indice;
+    if (toque || !tw) return;
+    cx.obj = (i + 0.5) * tw;
+    resCx = RES.soltar;
+    animar();
+  });
+
+  // ---------------------------------------------------------------- gesto
+  /** @type {{ id: number, x0: number, desfase: number, historia: {x: number, t: number}[], arrastra: boolean, previo: number } | null} */
   let toque = null;
 
-  const limitar = (v) => {
-    // dentro del rango se mueve libre; fuera, la mueve solo un 25% (banda elástica)
-    if (v < 0) return v * 0.25;
-    if (v > maximo) return maximo + (v - maximo) * 0.25;
+  // Resistencia tipo iOS fuera de los límites: cuanto más se pasa, menos avanza.
+  const banda = (exceso, dim) => (1 - 1 / ((exceso * 0.55) / dim + 1)) * dim;
+  function limitar(v) {
+    const min = tw / 2, max = interiorW - tw / 2;
+    if (v < min) return min - banda(min - v, tw);
+    if (v > max) return max + banda(v - max, tw);
     return v;
-  };
-  const pestanaEn = (local) => Math.max(0, Math.min(N - 1, Math.floor(local / anchoPestana)));
-  const masCercana = (valor) => Math.max(0, Math.min(N - 1, Math.round(valor / anchoPestana)));
+  }
+  const local = (e) => (barra ? e.clientX - barra.getBoundingClientRect().left - PAD : 0);
+  const pestanaEn = (x) => Math.max(0, Math.min(N - 1, Math.floor(x / tw)));
 
   function abajo(e) {
     if (!barra || (e.pointerType === 'mouse' && e.button !== 0)) return;
-    const caja = barra.getBoundingClientRect();
-    const local = e.clientX - caja.left - PAD;
-    const i = pestanaEn(local);
     barra.setPointerCapture(e.pointerId);
-    toque = {
-      id: e.pointerId,
-      desfase: local - anchoPestana / 2 - i * anchoPestana,
-      x0: e.clientX,
-      t: performance.now(),
-      ultimoX: e.clientX,
-      ultimoT: performance.now(),
-      indicePrevio: i,
-    };
-    presionada = true;
-    px = i * anchoPestana; // la lente viaja hasta la pestaña tocada
+    const x = local(e);
+    const i = pestanaEn(x);
+    toque = { id: e.pointerId, x0: e.clientX, desfase: x - (i + 0.5) * tw, historia: [{ x: e.clientX, t: e.timeStamp }], arrastra: false, previo: i };
+    cx.obj = (i + 0.5) * tw; // la lente va a la pestaña tocada…
+    resCx = RES.soltar;
+    pr.obj = 1;              // …y se levanta
+    resPr = RES.levantar;
+    animar();
   }
 
   function mover(e) {
-    if (!toque || e.pointerId !== toque.id || !barra) return;
-    if (!arrastrando && Math.abs(e.clientX - toque.x0) < 4) return;
-    arrastrando = true;
-    const caja = barra.getBoundingClientRect();
-    const local = e.clientX - caja.left - PAD;
-    px = limitar(local - anchoPestana / 2 - toque.desfase);
+    if (!toque || e.pointerId !== toque.id) return;
+    toque.historia.push({ x: e.clientX, t: e.timeStamp });
+    if (toque.historia.length > 6) toque.historia.shift();
+    if (!toque.arrastra && Math.abs(e.clientX - toque.x0) < 4) return;
+    toque.arrastra = true;
+    cx.obj = limitar(local(e) - toque.desfase);
+    resCx = RES.seguir;
+    const i = pestanaEn(cx.obj);
+    if (i !== toque.previo) { toque.previo = i; vibrar(6); }
+    animar();
+  }
 
-    const ahora = performance.now();
-    const dt = Math.max(1, ahora - toque.ultimoT);
-    const v = (e.clientX - toque.ultimoX) / dt; // px por ms
-    velocidad = velocidad * 0.6 + v * 0.4;      // suavizado para que no parpadee
-    toque.ultimoX = e.clientX;
-    toque.ultimoT = ahora;
-
-    const i = masCercana(px);
-    if (i !== toque.indicePrevio) { toque.indicePrevio = i; vibrar(6); } // "clic" al pasar por cada pestaña
+  function velocidadDedo() {
+    const h = toque?.historia ?? [];
+    if (h.length < 2) return 0;
+    const a = h[0], b = h[h.length - 1];
+    const dt = (b.t - a.t) / 1000;
+    return dt > 0 ? (b.x - a.x) / dt : 0; // px/s
   }
 
   function arriba(e) {
-    if (!toque || e.pointerId !== toque.id || !barra) return;
-    const caja = barra.getBoundingClientRect();
-    const local = e.clientX - caja.left - PAD;
-    const destino = arrastrando ? masCercana(px ?? 0) : pestanaEn(local);
-    soltar();
+    if (!toque || e.pointerId !== toque.id) return;
+    let destino;
+    if (toque.arrastra) {
+      // proyecta hacia dónde iba (como un "flick") y elige la pestaña más cercana a ese punto
+      const v = velocidadDedo();
+      const proyectado = cx.v + v * 0.09;
+      destino = Math.max(0, Math.min(N - 1, Math.round(proyectado / tw - 0.5)));
+      cx.vel = v; // la animación continúa a la velocidad del dedo: sin costura
+    } else {
+      destino = pestanaEn(local(e));
+    }
+    toque = null;
+    cx.obj = (destino + 0.5) * tw;
+    resCx = RES.soltar;
+    pr.obj = 0;
+    resPr = RES.bajar;
+    animar();
     ir(pestanas[destino].id);
   }
 
-  function soltar() {
+  function cancelar() {
+    if (!toque) return;
     toque = null;
-    presionada = false;
-    arrastrando = false;
-    px = null;
-    velocidad = 0;
+    cx.obj = (indice + 0.5) * tw;
+    resCx = RES.soltar;
+    pr.obj = 0;
+    resPr = RES.bajar;
+    animar();
   }
 </script>
 
@@ -184,25 +313,20 @@
     {/if}
   </div>
 
-  <!-- celular: barra flotante con lente de vidrio (3 capas hermanas: el vidrio de la barra,
-       las pestañas y la lente; así la lente "ve" lo que hay detrás de la barra) -->
+  <!-- celular: barra flotante con lente de vidrio -->
   <div
     class="barra"
-    class:presionada
-    class:arrastrando
     bind:this={barra}
-    bind:clientWidth={ancho}
-    bind:clientHeight={alto}
-    style="--n:{N}; --L:{izq}px; --W:{anchoLente}px; --C:{izq + anchoLente / 2}px; --ext:{presionada ? EXT : 0}px; --m:{presionada ? MAG : 1}; --sx:{escala}; --sy:{escalaY}; --w:{Math.max(0, ancho - PAD * 2)}px; --hl:{izq + PAD}px; --hr:{izq + anchoLente + PAD}px"
+    style="--n:{N}"
     onpointerdown={abajo}
     onpointermove={mover}
     onpointerup={arriba}
-    onpointercancel={soltar}
+    onpointercancel={cancelar}
     role="presentation"
   >
-    <span class="cristal vidrio vidrio-flotante vidrio-nativo" aria-hidden="true"></span>
+    <span class="cristal vidrio vidrio-flotante vidrio-nativo" bind:this={cristal} aria-hidden="true"></span>
 
-    <!-- las pestañas se "perforan" donde está la lente: ahí se lee la copia ampliada -->
+    <!-- pestañas reales (con foco y teclado). Se perforan donde está la lente. -->
     <div class="pestanas">
       {#each pestanas as p}
         <button class="pestana" aria-current={app.vista === p.id ? 'page' : undefined} onclick={(e) => e.detail === 0 && ir(p.id)}>
@@ -212,31 +336,41 @@
       {/each}
     </div>
 
-    <span class="lente" class:levantada={presionada} class:arrastrando aria-hidden="true">
-      <span class="lupa" class:refracta={presionada && mapa}>
-        <span class="copia">
-          {#each pestanas as p}
-            <span class="pestana roja">
-              <Icono nombre={p.icono} tam={24} />
-              <span>{p.texto}</span>
+    <span class="lente" aria-hidden="true">
+      <span class="sombra"></span>
+      <span class="recorte">
+        <span class="pastilla"></span>
+        <span class="lupa" class:refracta={levantada && mapa}>
+          <!-- copia de la barra (fondo + pestañas) que la lente agranda y refracta -->
+          <span class="base"></span>
+          <span class="fantasma"></span>
+          <span class="copia">
+            <span class="fila">
+              {#each pestanas as p}
+                <span class="pestana" class:activa={app.vista === p.id}>
+                  <Icono nombre={p.icono} tam={24} grosor={2.3} />
+                  <span>{p.texto}</span>
+                </span>
+              {/each}
             </span>
-          {/each}
+          </span>
         </span>
       </span>
+      <span class="brillo"></span>
     </span>
 
-    <!-- filtro de refracción: dobla el contenido en el borde de la lente y separa los colores -->
+    <!-- refracción con dispersión: cada canal de color se desvía un poco distinto (arcoíris en el borde) -->
     <svg class="filtros" width="0" height="0" aria-hidden="true" focusable="false">
       <defs>
-        <filter id="refraccion" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+        <filter id="refraccion" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
           <feFlood flood-color="rgb(128,128,128)" result="neutro" />
-          <feImage href={mapa} x="0" y="0" width={anchoLente} height={altoLente} preserveAspectRatio="none" result="mapa0" />
+          <feImage bind:this={feImagen} href={mapa} x="0" y="0" width="0" height="0" preserveAspectRatio="none" result="mapa0" />
           <feComposite in="mapa0" in2="neutro" operator="over" result="mapa" />
-          <feDisplacementMap in="SourceGraphic" in2="mapa" scale="15" xChannelSelector="R" yChannelSelector="G" result="dr" />
+          <feDisplacementMap bind:this={feR} in="SourceGraphic" in2="mapa" scale="0" xChannelSelector="R" yChannelSelector="G" result="dr" />
           <feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr" />
-          <feDisplacementMap in="SourceGraphic" in2="mapa" scale="19" xChannelSelector="R" yChannelSelector="G" result="dg" />
+          <feDisplacementMap bind:this={feG} in="SourceGraphic" in2="mapa" scale="0" xChannelSelector="R" yChannelSelector="G" result="dg" />
           <feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg" />
-          <feDisplacementMap in="SourceGraphic" in2="mapa" scale="23" xChannelSelector="R" yChannelSelector="G" result="db" />
+          <feDisplacementMap bind:this={feB} in="SourceGraphic" in2="mapa" scale="0" xChannelSelector="R" yChannelSelector="G" result="db" />
           <feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb" />
           <feBlend in="cr" in2="cg" mode="screen" result="rg" />
           <feBlend in="rg" in2="cb" mode="screen" />
@@ -249,12 +383,10 @@
 <style>
   .lateral { display: none; }
 
-  /* propiedades animables para el "agujero" que la lente hace en las pestañas */
-  @property --hl { syntax: '<length>'; inherits: true; initial-value: 0px; }
-  @property --hr { syntax: '<length>'; inherits: true; initial-value: 0px; }
-
   .barra {
-    --resorte: cubic-bezier(0.3, 1.35, 0.45, 1); /* rebote corto al soltar */
+    /* valores iniciales; luego los escribe la física en cada cuadro */
+    --L: 0px; --W: 0px; --H: 0px; --T: 0px; --ox: 0px; --m: 1; --sx: 1; --sy: 1; --p: 0; --hl: 0px; --hr: 0px;
+    --fantasma: color-mix(in srgb, var(--fondo) 30%, #ffffff);
     position: fixed;
     z-index: 50;
     left: 12px;
@@ -268,13 +400,7 @@
     -webkit-user-select: none;
     user-select: none;
   }
-  .cristal {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    transition: transform 420ms var(--resorte);
-  }
-  .barra.presionada .cristal { transform: scale(1.05, 1.07); } /* la barra se ensancha al tocarla, como en iOS */
+  .cristal { position: absolute; inset: 0; border-radius: inherit; will-change: transform; }
 
   .pestanas {
     position: absolute;
@@ -282,12 +408,10 @@
     padding: 4px;
     display: grid;
     grid-template-columns: repeat(var(--n), 1fr);
-    /* agujero donde está la lente: no se ve el contenido original debajo del ampliado */
+    /* agujero donde está la lente: debajo no se ve el original, solo la copia agrandada */
     -webkit-mask-image: linear-gradient(90deg, #000 var(--hl), transparent var(--hl), transparent var(--hr), #000 var(--hr));
     mask-image: linear-gradient(90deg, #000 var(--hl), transparent var(--hl), transparent var(--hr), #000 var(--hr));
-    transition: --hl 460ms var(--resorte), --hr 460ms var(--resorte);
   }
-  .barra.arrastrando .pestanas { transition: none; }
   .pestana {
     position: relative;
     display: grid;
@@ -299,132 +423,111 @@
     font-weight: 600;
     letter-spacing: 0.01em;
     border-radius: 999px;
-    pointer-events: none; /* los toques los recibe la barra completa */
   }
-  .pestanas .pestana { pointer-events: auto; }
+  .pestanas .pestana[aria-current='page'] { color: var(--rojo); }
 
   /* ---------------- la lente */
   .lente {
     position: absolute;
-    top: calc(4px - var(--ext));
-    bottom: calc(4px - var(--ext));
     left: 4px;
+    top: 4px;
     width: var(--W);
+    height: var(--H);
     border-radius: 999px;
-    overflow: hidden;
     pointer-events: none;
-    transform: translate3d(var(--L), 0, 0) scale(var(--sx), var(--sy));
-    transition:
-      transform 460ms var(--resorte), width 460ms var(--resorte), top 460ms var(--resorte), bottom 460ms var(--resorte),
-      background-color 200ms ease, box-shadow 200ms ease, backdrop-filter 200ms ease;
-    will-change: transform;
-    /* en reposo: cápsula gris translúcida (como el selector de iOS) */
-    background: linear-gradient(180deg, rgba(120, 120, 128, 0.2), rgba(120, 120, 128, 0.12));
-    -webkit-backdrop-filter: blur(1px) saturate(180%);
-    backdrop-filter: blur(1px) saturate(180%);
-    box-shadow:
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.55),
-      inset 0 1px 1px rgba(255, 255, 255, 0.8),
-      inset 0 -1px 1px rgba(255, 255, 255, 0.25),
-      0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    transform: translate3d(var(--L), var(--T), 0) scale(var(--sx), var(--sy));
+    will-change: transform, width, height;
   }
-  .lente.arrastrando {
-    transition: width 460ms var(--resorte), top 460ms var(--resorte), bottom 460ms var(--resorte),
-      background-color 200ms ease, box-shadow 200ms ease, backdrop-filter 200ms ease;
-  } /* la posición sigue al dedo sin retraso; el tamaño sí se anima */
-  /* levantada: vidrio casi transparente que aclara y satura lo que hay detrás, con borde de luz y sombra */
-  .lente.levantada {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03));
-    -webkit-backdrop-filter: blur(0.4px) saturate(230%) brightness(1.12) contrast(1.05);
-    backdrop-filter: blur(0.4px) saturate(230%) brightness(1.12) contrast(1.05);
-    box-shadow:
-      inset 0 0 0 0.75px rgba(255, 255, 255, 0.9),
-      inset 0 2px 2px rgba(255, 255, 255, 0.95),
-      inset 0 -2px 3px rgba(255, 255, 255, 0.5),
-      inset 5px 0 10px -4px rgba(255, 255, 255, 0.75),
-      inset -5px 0 10px -4px rgba(255, 255, 255, 0.55),
-      0 0 0 0.5px rgba(31, 38, 60, 0.12),
-      0 14px 32px rgba(31, 38, 60, 0.26),
-      0 3px 8px rgba(0, 0, 0, 0.12);
-  }
-  /* reflejo curvo, como luz sobre una gota de vidrio */
-  .lente::after {
-    content: '';
+  /* sombra muy suave que aparece al levantarla (sobre una barra clara casi no se nota, como en iOS) */
+  .sombra {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    pointer-events: none;
-    background:
-      radial-gradient(120% 70% at 28% -8%, rgba(255, 255, 255, 0.55), transparent 58%),
-      radial-gradient(90% 60% at 80% 118%, rgba(255, 255, 255, 0.25), transparent 62%);
-    mix-blend-mode: soft-light;
+    opacity: var(--p);
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.07), 0 6px 18px rgba(31, 38, 60, 0.14), 0 1px 3px rgba(0, 0, 0, 0.08);
   }
-  /* aro con colores del arcoíris en el borde: la luz que se separa al atravesar el vidrio */
-  .lente::before {
-    content: '';
+  .recorte { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }
+  /* en reposo: la cápsula gris del selector; se desvanece al levantarse */
+  .pastilla {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    padding: 1.5px;
-    pointer-events: none;
-    background: conic-gradient(from 200deg, #ff5e8a, #ffb454, #fff27a, #6bff9e, #5ec8ff, #8f7bff, #ff5e8a);
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-    mask-composite: exclude;
-    opacity: 0;
-    transition: opacity 200ms ease;
+    background: rgba(120, 120, 128, 0.17);
+    opacity: calc(1 - var(--p));
   }
-  .lente.levantada::before { opacity: 0.38; }
-
-  /* contenedor del filtro: tiene el tamaño de la lente para que el mapa de refracción coincida */
   .lupa { position: absolute; inset: 0; display: block; }
   .lupa.refracta { filter: url(#refraccion); }
 
-  /* copia de las pestañas recortada por la lente. Al levantarla se ve más grande (efecto lupa)
-     y oscura, como el contenido real de la barra de iOS; en reposo se tiñe de rojo. */
+  /* copia de la barra alineada con la real; se agranda alrededor del centro de la lente */
   .copia {
     position: absolute;
-    top: var(--ext);
-    left: 0;
-    height: calc(100% - var(--ext) * 2);
+    left: calc(var(--L) * -1);
+    top: calc(var(--T) * -1);
     width: var(--w);
-    display: grid;
-    grid-template-columns: repeat(var(--n), 1fr);
-    transform: translate3d(calc(var(--L) * -1), 0, 0) scale(var(--m));
-    transform-origin: var(--C) 50%;
-    transition: transform 460ms var(--resorte), transform-origin 460ms var(--resorte), top 460ms var(--resorte), height 460ms var(--resorte);
-    will-change: transform;
+    height: var(--ih);
+    transform: scale(var(--m));
+    transform-origin: var(--ox) 50%;
   }
-  .lente.arrastrando .copia { transition: top 460ms var(--resorte), height 460ms var(--resorte); } /* sigue al dedo sin retraso */
-  .pestana.roja { color: var(--rojo); pointer-events: none; transition: color 200ms ease; }
-  .lente.levantada .pestana.roja { color: var(--tinta); font-weight: 700; }
+  /* el fondo de la barra, en su posición real (sin aumento): como la lente sobresale, su borde se ve
+     como una línea dentro de la lente que el bisel dobla (igual que en iOS), y le da a la refracción
+     algo claro que separar en colores */
+  .fantasma {
+    position: absolute;
+    left: calc(-4px - var(--L));
+    top: calc(-4px - var(--T));
+    width: calc(var(--w) + 8px);
+    height: calc(var(--ih) + 8px);
+    border-radius: 999px;
+    background: var(--fantasma);
+    box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    opacity: var(--p);
+  }
+  /* lo que hay detrás fuera de la barra (la página): así la lente no tiene huecos que se tiñan */
+  .base {
+    position: absolute;
+    inset: -12px;
+    background: var(--fondo);
+    opacity: var(--p);
+  }
+  .fila { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--n), 1fr); }
+  .fila .pestana { font-weight: 700; }
+  .fila .pestana.activa { color: var(--rojo); }
+
+  /* brillo especular: un hilo de luz que sigue la forma, más fuerte arriba a la izquierda y abajo a la derecha */
+  .brillo {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--p);
+    box-shadow:
+      inset 0 0 0 0.6px rgba(255, 255, 255, 0.7),
+      inset 0 1.2px 1px rgba(255, 255, 255, 0.85),
+      inset 0 -1px 1px rgba(255, 255, 255, 0.45);
+  }
+  .brillo::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.4px;
+    background: linear-gradient(125deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0) 68%, rgba(255, 255, 255, 0.7));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
   .filtros { position: absolute; pointer-events: none; }
 
   @media (prefers-color-scheme: dark) {
-    .lente {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06));
-      box-shadow:
-        inset 0 0 0 0.5px rgba(255, 255, 255, 0.28),
-        inset 0 1.5px 1px rgba(255, 255, 255, 0.4),
-        inset 0 -1px 1px rgba(255, 255, 255, 0.12),
-        0 4px 14px rgba(0, 0, 0, 0.4);
-    }
-    .lente.levantada {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02));
-      box-shadow:
-        inset 0 0 0 0.75px rgba(255, 255, 255, 0.5),
-        inset 0 2px 2px rgba(255, 255, 255, 0.55),
-        inset 3px 0 6px -2px rgba(255, 255, 255, 0.35),
-        inset -3px 0 6px -2px rgba(255, 255, 255, 0.22),
-        0 12px 30px rgba(0, 0, 0, 0.55);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .lente, .copia { transition-duration: 1ms; }
+    .barra { --fantasma: #1f1f22; }
+    .pastilla { background: rgba(255, 255, 255, 0.14); }
+    .fantasma { box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12); }
+    .brillo { box-shadow: inset 0 0 0 0.6px rgba(255, 255, 255, 0.3), inset 0 1.2px 1px rgba(255, 255, 255, 0.35); }
+    .brillo::before { opacity: 0.45; }
+    .sombra { box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 8px 22px rgba(0, 0, 0, 0.5); }
   }
   @media (prefers-reduced-transparency: reduce) {
-    .lente, .lente.levantada { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--vidrio-fuerte); }
+    .lupa.refracta { filter: none; }
   }
 
   @media (min-width: 980px) {
