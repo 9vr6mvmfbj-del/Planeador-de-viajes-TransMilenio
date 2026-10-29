@@ -24,15 +24,15 @@
   // =============================================================== lente de Liquid Glass
   // Réplica de la barra de pestañas de iOS 26/27:
   //  · en reposo es una cápsula gris bajo la pestaña activa;
-  //  · al tocarla "se levanta": crece (~1,6 pestañas), sobresale de la barra, se vuelve vidrio
+  //  · al tocarla "se levanta": crece (~1,3 pestañas), sobresale de la barra, se vuelve vidrio
   //    transparente que agranda lo que tiene debajo y dobla el contenido en el borde (refracción);
   //  · se arrastra con el dedo, se estira con la velocidad y tiene resistencia en los bordes;
   //  · al soltar proyecta hacia dónde iba, cae en esa pestaña y vuelve a ser cápsula con un rebote.
   // Todo se mueve con resortes (física), no con transiciones CSS: así arranca siempre desde donde
   // está, hereda la velocidad del dedo y se puede agarrar a mitad de camino.
 
-  const K = 1.6;         // ancho de la lente levantada, en pestañas
-  const EXT = 7;         // cuánto sobresale arriba y abajo (px)
+  const K = 1.32;        // ancho de la lente levantada, en pestañas
+  const EXT = 6;         // cuánto sobresale arriba y abajo (px)
   const AUMENTO = 0.18;  // la lupa agranda 18%
   const REFRACCION = 15; // desplazamiento máximo en el borde (px)
 
@@ -418,10 +418,10 @@
     justify-items: center;
     align-content: center;
     gap: 2px;
-    color: var(--tenue);
+    color: var(--tinta); /* sobre vidrio el texto va oscuro y con peso, no gris plano (vibrancia) */
     font-size: 10.5px;
     font-weight: 600;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.015em;
     border-radius: 999px;
   }
   .pestanas .pestana[aria-current='page'] { color: var(--rojo); }
@@ -490,7 +490,8 @@
     opacity: var(--p);
   }
   .fila { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--n), 1fr); }
-  .fila .pestana { font-weight: 700; }
+  /* bajo la lente: el texto se agranda (transform), se engruesa y el borde lo deforma (filtro) */
+  .fila .pestana { font-weight: 750; }
   .fila .pestana.activa { color: var(--rojo); }
 
   /* brillo especular: un hilo de luz que sigue la forma, más fuerte arriba a la izquierda y abajo a la derecha */
