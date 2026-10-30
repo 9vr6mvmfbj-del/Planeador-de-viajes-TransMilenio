@@ -1,10 +1,11 @@
 <script>
   import { colorRuta, tintaSobre } from '../lib/colores.js';
-  let { ruta, grande = false } = $props();
+  import Resaltado from './Resaltado.svelte';
+  let { ruta, grande = false, consulta = '' } = $props();
   let color = $derived(colorRuta(ruta));
 </script>
 
-<span class="ruta" class:grande style="background:{color}; color:{tintaSobre(color)}">{ruta}</span>
+<span class="ruta" class:grande style="background:{color}; color:{tintaSobre(color)}">{#if consulta}<Resaltado texto={ruta} {consulta} sobreColor />{:else}{ruta}{/if}</span>
 
 <style>
   .ruta {
