@@ -2,10 +2,10 @@
   // La fila de abordaje, en vivo. SOLO ILUSTRA: cada punto agrupa k pasajeros y usa los mismos datos
   // (llegadas, frecuencia, capacidad); las cifras de verdad las calcula el motor (R10) en Fila.svelte.
   //
-  //  · Avanza sola cuando la tarjeta entra en pantalla (1 minuto simulado ≈ 0,25 s).
-  //  · Debajo hay una línea de tiempo con un mango: al arrastrarlo la escena salta a esa hora
-  //    (la simulación ilustrativa se recalcula desde las 05:00 de forma determinista: ir atrás o
-  //    adelante da siempre lo mismo). Tres segundos después de soltarlo vuelve a avanzar sola.
+  //  · Empieza quieta. Se mueve con el dedo: arrastrando el mango de la línea de tiempo o la escena.
+  //  · Al soltar conserva el impulso del gesto (inercia que frena sola) y, exactamente 3 s después de
+  //    soltar, vuelve a avanzar sola acelerando suave (1 minuto simulado ≈ 0,25 s).
+  //  · La simulación ilustrativa es determinista: ir atrás o adelante a la misma hora da lo mismo.
   import { onMount } from 'svelte';
   import Numero from './Numero.svelte';
   let { llegadas, duracion, frecuencia, capacidad, pasajeros } = $props();
@@ -60,20 +60,25 @@
     return Math.max(duracion, Math.ceil(m / frecuencia) * frecuencia);
   }
 
-  // ------------------------------------------------------------ reloj y control
+  // ------------------------------------------------------------ reloj y control (física tipo iOS)
   let t = $state(0);            // minuto simulado (con decimales)
   let enFila = $state(0);
-  let pausa = $state(false);    // el dedo movió el mango
-  let reanuda = $state(0);      // 0..1 progreso de los 3 s antes de seguir solo
-  let visible = false, yaEmpezo = false;
+  // modo: 'quieto' (al entrar) · 'arrastre' (dedo encima) · 'suelto' (inercia + cuenta de 3 s) · 'auto'
+  let modo = $state('quieto');
+  let reanuda = $state(0);      // 0..1 progreso de los 3 s
+  let visible = false;
   let esperaHasta = 0;          // pausa al final antes de repetir
-  let temporizador = 0;
+  let vel = 0;                  // velocidad actual (min simulados por segundo)
+  let soltadoEn = 0;
+  let desborde = 0;             // cuánto se pasó el mango del borde (px), vuelve con resorte
 
   function reiniciar() {
     sim = nuevaSim();
     fin = calcularFin();
-    const inicio = reducido ? Math.round(duracion * 0.55) : 0; // variable local: el efecto no debe depender de t
+    const inicio = Math.round(duracion * 0.5); // arranca quieta a mitad de la hora pico (variable local: el efecto no depende de t)
     t = inicio;
+    modo = 'quieto';
+    vel = 0;
     saltar(inicio);
   }
   $effect(() => { llegadas; duracion; frecuencia; capacidad; k; reiniciar(); });
@@ -86,23 +91,64 @@
     for (const p of sim.fila) { p.x = null; p.yy = null; }
     enFila = Math.round(sim.fila.length * k);
   }
-
-  function alMover(e) {
-    const v = Number(e.currentTarget.value);
-    pausa = true;
-    reanuda = 0;
-    clearInterval(temporizador);
+  // Mover el tiempo: hacia adelante y poquito se anima (la gente camina), atrás o mucho salta.
+  function irA(nuevo, animar) {
+    const v = Math.max(0, Math.min(fin, nuevo));
+    if (animar && v >= t && v - t < 4) avanzarHasta(sim, v, true, alto);
+    else if (Math.floor(v) !== Math.floor(t) || v < t) saltar(v);
     t = v;
-    saltar(v);
   }
-  function alSoltar() {
-    if (!pausa) return;
-    clearInterval(temporizador);
-    const inicio = performance.now();
-    temporizador = setInterval(() => {
-      reanuda = Math.min(1, (performance.now() - inicio) / 3000);
-      if (reanuda >= 1) { clearInterval(temporizador); pausa = false; reanuda = 0; }
-    }, 50);
+
+  // ---- gesto: arrastrar el mango (posición) o la escena (desplazamiento)
+  let pista = $state(/** @type {HTMLElement | null} */ (null));
+  let mango = $state(/** @type {HTMLElement | null} */ (null));
+  /** @type {{ id: number, tipo: 'pista'|'escena', x0: number, t0: number, ancho: number, izq: number, historia: {x: number, t: number}[] } | null} */
+  let dedo = null;
+  const banda = (exceso) => (1 - 1 / ((Math.abs(exceso) * 0.55) / 60 + 1)) * 60 * Math.sign(exceso);
+
+  function agarrar(e, tipo) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = /** @type {HTMLElement} */ (e.currentTarget);
+    el.setPointerCapture(e.pointerId);
+    const r = (tipo === 'pista' ? pista : el).getBoundingClientRect();
+    dedo = { id: e.pointerId, tipo, x0: e.clientX, t0: t, ancho: r.width - 28, izq: r.left + 14, historia: [{ x: e.clientX, t: e.timeStamp }] };
+    modo = 'arrastre';
+    vel = 0;
+    reanuda = 0;
+    if (tipo === 'pista') moverDedo(e); // tocar la pista lleva el mango ahí
+  }
+  function moverDedo(e) {
+    if (!dedo || e.pointerId !== dedo.id) return;
+    dedo.historia.push({ x: e.clientX, t: e.timeStamp });
+    if (dedo.historia.length > 6) dedo.historia.shift();
+    const objetivo = dedo.tipo === 'pista'
+      ? ((e.clientX - dedo.izq) / dedo.ancho) * fin
+      : dedo.t0 + ((e.clientX - dedo.x0) / dedo.ancho) * fin * 0.6;
+    const px = ((objetivo - Math.max(0, Math.min(fin, objetivo))) / fin) * dedo.ancho;
+    desborde = banda(px); // resistencia elástica al pasarse del borde
+    irA(objetivo, true);
+  }
+  function soltar(e) {
+    if (!dedo || e.pointerId !== dedo.id) return;
+    const h = dedo.historia, a = h[0], b = h[h.length - 1];
+    const dt = (b.t - a.t) / 1000;
+    const pxs = dt > 0.008 && e.timeStamp - b.t < 80 ? (b.x - a.x) / dt : 0; // px/s del dedo (0 si se quedó quieto)
+    vel = (pxs / dedo.ancho) * fin * (dedo.tipo === 'pista' ? 1 : 0.6);
+    dedo = null;
+    modo = 'suelto';
+    soltadoEn = performance.now();
+  }
+  function teclado(e) {
+    const paso = e.shiftKey ? 10 : 1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') irA(t + paso, false);
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') irA(t - paso, false);
+    else if (e.key === 'Home') irA(0, false);
+    else if (e.key === 'End') irA(fin, false);
+    else return;
+    e.preventDefault();
+    vel = 0;
+    modo = 'suelto';
+    soltadoEn = performance.now();
   }
 
   const aHora = (m) => { const x = INICIO_MIN + Math.floor(m); return String(Math.floor(x / 60) % 24).padStart(2, '0') + ':' + String(x % 60).padStart(2, '0'); };
@@ -201,31 +247,47 @@
     };
     medir();
     const ro = new ResizeObserver(medir); ro.observe(lienzo);
-    const io = new IntersectionObserver(([e]) => {
-      visible = e.isIntersecting;
-      if (visible && !yaEmpezo) { yaEmpezo = true; if (!reducido) { t = 0; saltar(0); } }
-    }, { threshold: 0.25 });
+    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; }, { threshold: 0.15 });
     if (caja) io.observe(caja);
 
     const bucle = (ahora) => {
       raf = requestAnimationFrame(bucle);
       const dt = Math.min(0.05, (ahora - antes) / 1000); antes = ahora;
       if (document.hidden || !visible) return;
-      const corre = !reducido && !pausa && yaEmpezo;
-      if (corre) {
+      let animar = false;
+      if (modo === 'suelto') {
+        // inercia: sigue con la velocidad del gesto y frena sola (fricción tipo iOS)
+        if (Math.abs(vel) > 0.05) {
+          irA(t + vel * dt, vel > 0);
+          vel *= Math.exp(-dt * 3.2);
+          if (t <= 0 || t >= fin) vel = 0;
+          animar = vel > 0;
+        }
+        reanuda = Math.min(1, (ahora - soltadoEn) / 3000);
+        if (reanuda >= 1) { modo = 'auto'; reanuda = 0; if (vel < 0) vel = 0; }
+      } else if (modo === 'auto' && !reducido) {
+        // retoma: la velocidad crece suave hasta la normal (no arranca de golpe)
+        vel += (minPorSeg - vel) * (1 - Math.exp(-dt * 2.4));
         if (t >= fin) {
           if (!esperaHasta) esperaHasta = ahora + 2500;
-          else if (ahora > esperaHasta) { esperaHasta = 0; t = 0; saltar(0); }
+          else if (ahora > esperaHasta) { esperaHasta = 0; vel = 0; t = 0; saltar(0); }
         } else {
-          t = Math.min(fin, t + dt * minPorSeg);
+          t = Math.min(fin, t + vel * dt);
           avanzarHasta(sim, t, true, h);
+          animar = true;
         }
       }
-      dibujar(g, w, h, dt, corre);
+      // el mango vuelve a su sitio con resorte si se pasó del borde
+      if (!dedo && desborde) { desborde *= Math.exp(-dt * 14); if (Math.abs(desborde) < 0.3) desborde = 0; }
+      if (mango && pista) {
+        const ancho = pista.clientWidth - 28;
+        mango.style.transform = `translate3d(${((Math.min(t, fin) / Math.max(1, fin)) * ancho + desborde).toFixed(2)}px,0,0) scale(${dedo ? 1.15 : 1})`;
+      }
+      dibujar(g, w, h, dt, animar || modo === 'arrastre');
       if (ahora - ultimoConteo > 150) { ultimoConteo = ahora; enFila = Math.round(sim.fila.length * k); }
     };
     raf = requestAnimationFrame(bucle);
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); clearInterval(temporizador); };
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); };
   });
 </script>
 
@@ -238,7 +300,7 @@
     </span>
   </div>
 
-  <div class="escena">
+  <div class="escena" role="presentation" onpointerdown={(e) => agarrar(e, 'escena')} onpointermove={moverDedo} onpointerup={soltar} onpointercancel={soltar}>
     <canvas bind:this={lienzo} aria-hidden="true"></canvas>
     <span class="rotulo izq mini">Entran →</span>
   </div>
@@ -248,21 +310,22 @@
     si llegan más de los que caben, la fila crece. <span class="tenue">Azul: acaba de llegar · rojo: lleva rato esperando.</span>
   </p>
 
-  <div class="linea-tiempo" class:pausa>
+  <div class="linea-tiempo" bind:this={pista}
+    role="slider" tabindex="0" aria-label="Hora de la simulación" aria-valuemin="0" aria-valuemax={fin} aria-valuenow={Math.round(t)} aria-valuetext={reloj}
+    onpointerdown={(e) => agarrar(e, 'pista')} onpointermove={moverDedo} onpointerup={soltar} onpointercancel={soltar} onkeydown={teclado}>
     <svg class="curva" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><path d={curva} /></svg>
-    <input
-      type="range" min="0" max={fin} step="0.25" value={Math.min(t, fin)}
-      aria-label="Hora de la simulación" aria-valuetext={reloj}
-      oninput={alMover} onpointerup={alSoltar} onpointercancel={alSoltar} ontouchend={alSoltar} onkeyup={alSoltar} onchange={alSoltar}
-    />
+    <span class="riel" aria-hidden="true"></span>
+    <span class="mango" class:activo={modo === 'arrastre'} bind:this={mango} aria-hidden="true"></span>
   </div>
   <div class="pie-tiempo mini tenue num">
     <span>{aHora(0)}</span>
     <span class="estado-tiempo">
-      {#if pausa}
+      {#if modo === 'suelto'}
         <svg class="anillo" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" /><circle class="progreso" cx="10" cy="10" r="8" style="stroke-dashoffset:{50.3 * (1 - reanuda)}" /></svg>
-        {reanuda > 0 ? `Sigue sola en ${Math.max(1, Math.ceil(3 - reanuda * 3))} s` : 'Suelta para seguir'}
-      {:else if reducido}Arrastra para ver otra hora{:else}Arrastra el punto para ver otra hora{/if}
+        Sigue sola en {Math.max(1, Math.ceil(3 - reanuda * 3))} s
+      {:else if modo === 'arrastre'}Suelta para que siga sola
+      {:else if modo === 'auto'}<span class="punto-vivo" aria-hidden="true"></span>En vivo · toca para mover la hora
+      {:else}Arrastra la fila o el punto para mover la hora{/if}
     </span>
     <span>{aHora(fin)}</span>
   </div>
@@ -281,25 +344,25 @@
   .rotulo.izq { left: 8px; }
   .explica { margin-top: 10px; line-height: 1.45; }
 
-  .linea-tiempo { position: relative; height: 44px; margin-top: 12px; }
-  .curva { position: absolute; left: 14px; right: 14px; bottom: 21px; width: calc(100% - 28px); height: 20px; pointer-events: none; }
+  .escena { touch-action: pan-y; cursor: grab; -webkit-user-select: none; user-select: none; }
+  .escena:active { cursor: grabbing; }
+  .linea-tiempo {
+    position: relative; height: 44px; margin-top: 12px; border-radius: 12px;
+    touch-action: pan-y; cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .curva { position: absolute; left: 14px; right: 14px; bottom: 22px; width: calc(100% - 28px); height: 20px; pointer-events: none; }
   .curva path { fill: color-mix(in srgb, var(--azul) 18%, transparent); }
-  input[type='range'] {
-    position: absolute; inset: 0; width: 100%; height: 44px; margin: 0;
-    -webkit-appearance: none; appearance: none; background: transparent;
-    touch-action: pan-y; cursor: grab;
-  }
-  input[type='range']:active { cursor: grabbing; }
-  input[type='range']::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--relleno-2); }
-  input[type='range']::-moz-range-track { height: 4px; border-radius: 2px; background: var(--relleno-2); }
-  input[type='range']::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 28px; height: 28px; margin-top: -12px; border-radius: 50%;
-    background: #fff; border: 0;
+  .riel { position: absolute; left: 14px; right: 14px; bottom: 20px; height: 4px; border-radius: 2px; background: var(--relleno-2); }
+  .mango {
+    position: absolute; left: 0; bottom: 8px; width: 28px; height: 28px; border-radius: 50%;
+    background: #fff;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18), 0 0.5px 4px rgba(0, 0, 0, 0.14), inset 0 0 0 6px var(--rojo);
-    transition: transform 160ms var(--salida);
+    will-change: transform; pointer-events: none;
+    transition: box-shadow 200ms ease;
   }
-  input[type='range']::-moz-range-thumb { width: 28px; height: 28px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18), inset 0 0 0 6px var(--rojo); }
-  input[type='range']:active::-webkit-slider-thumb { transform: scale(1.12); }
+  .mango.activo { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22), 0 0.5px 4px rgba(0, 0, 0, 0.14), inset 0 0 0 5px var(--rojo); }
+  .punto-vivo { width: 7px; height: 7px; border-radius: 50%; background: var(--rojo); animation: latido 1.4s ease-in-out infinite; }
+  @keyframes latido { 50% { opacity: 0.35; } }
   .pie-tiempo { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 2px; }
   .estado-tiempo { display: inline-flex; align-items: center; gap: 6px; color: var(--tinta-2); font-weight: 600; text-align: center; }
   .anillo { width: 14px; height: 14px; transform: rotate(-90deg); }
