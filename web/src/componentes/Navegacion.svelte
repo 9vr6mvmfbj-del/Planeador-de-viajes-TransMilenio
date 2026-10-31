@@ -49,7 +49,8 @@
   let ancho = 0, alto = 0, interiorW = 0, interiorH = 0, tw = 0;
 
   // resortes: valor, velocidad, objetivo
-  const cx = { v: 0, vel: 0, obj: 0 }; // centro de la lente (px, dentro del interior)
+  const cx = { v: 0, vel: 0, obj: 0 }; // borde que lidera de la lente (px, dentro del interior)
+  const cz = { v: 0, vel: 0, obj: 0 }; // borde que sigue: persigue al de adelante más lento, así la lente se estira como una gota
   const pr = { v: 0, vel: 0, obj: 0 }; // cuánto está levantada (0 cápsula → 1 lente)
   const st = { v: 0, vel: 0, obj: 0 }; // estiramiento por velocidad
 
@@ -61,6 +62,8 @@
     levantar: { r: 0.3, z: reducido ? 1 : 0.58 },  // "pop" al tocar
     bajar: { r: 0.36, z: reducido ? 1 : 0.8 },
     estirar: { r: 0.12, z: 1 },
+    cola: { r: 0.64, z: reducido ? 1 : 0.82 },    // el borde de atrás llega después y con menos rebote
+    colaSeguir: { r: 0.2, z: 1 },                 // al arrastrar, se queda un poco atrás del dedo
   };
   let resCx = RES.soltar, resPr = RES.bajar;
 
@@ -83,12 +86,14 @@
     const sub = 4;
     for (let i = 0; i < sub; i++) {
       paso(cx, resCx, dt / sub);
+      cz.obj = cx.obj;
+      paso(cz, reducido ? resCx : resCx === RES.seguir ? RES.colaSeguir : RES.cola, dt / sub);
       paso(pr, resPr, dt / sub);
       st.obj = reducido ? 0 : Math.min(0.2, Math.abs(cx.vel) / 4200);
       paso(st, RES.estirar, dt / sub);
     }
     pintar();
-    if (toque || !(quieto(cx) && quieto(pr) && quieto(st))) cuadro = requestAnimationFrame(bucle);
+    if (toque || !(quieto(cx) && quieto(cz) && quieto(pr) && quieto(st))) cuadro = requestAnimationFrame(bucle);
     else { cuadro = 0; pintar(); }
   }
 
@@ -97,17 +102,23 @@
     if (!barra || !tw) return;
     const p = pr.v;                       // puede pasar de 1 por el rebote: da el "pop"
     const p01 = Math.max(0, Math.min(1, p));
-    const W = tw * (1 + (K - 1) * p);
+    // liquid morph: los dos bordes viajan con resortes distintos; lo que los separa es el estiramiento de la gota
+    const base = tw * (1 + (K - 1) * p);
+    const atras = Math.min(cx.v, cz.v), adelante = Math.max(cx.v, cz.v);
+    const extra = adelante - atras;
+    const W = base + extra;
     const H = interiorH + 2 * EXT * p;
-    const L = cx.v - W / 2;
+    const centro = (atras + adelante) / 2;
+    const L = centro - W / 2;
     const m = 1 + AUMENTO * p;
-    const sx = 1 + st.v, sy = 1 - st.v * 0.5;
+    const sx = 1 + st.v * 0.4;
+    const sy = 1 - st.v * 0.2 - Math.min(0.09, (extra / tw) * 0.07); // al estirarse se afina, como una gota
     const s = barra.style;
     s.setProperty('--L', L + 'px');
     s.setProperty('--W', W + 'px');
     s.setProperty('--H', H + 'px');
     s.setProperty('--T', (interiorH - H) / 2 + 'px');
-    s.setProperty('--ox', cx.v + 'px');
+    s.setProperty('--ox', centro + 'px');
     s.setProperty('--m', String(m));
     s.setProperty('--sx', String(sx));
     s.setProperty('--sy', String(sy));
@@ -171,7 +182,7 @@
     barra.style.setProperty('--w', interiorW + 'px');
     barra.style.setProperty('--ih', interiorH + 'px');
     mapa = generarMapa(Math.round(tw * K * 2), Math.round((interiorH + EXT * 2) * 2));
-    if (!toque) { cx.v = cx.obj = (indice + 0.5) * tw; cx.vel = 0; }
+    if (!toque) { cx.v = cx.obj = cz.v = cz.obj = (indice + 0.5) * tw; cx.vel = cz.vel = 0; }
     pintar();
   }
 
@@ -249,6 +260,7 @@
       const proyectado = cx.v + v * 0.09;
       destino = Math.max(0, Math.min(N - 1, Math.round(proyectado / tw - 0.5)));
       cx.vel = v; // la animación continúa a la velocidad del dedo: sin costura
+      cz.vel = v * 0.7;
     } else {
       destino = pestanaEn(local(e));
     }
