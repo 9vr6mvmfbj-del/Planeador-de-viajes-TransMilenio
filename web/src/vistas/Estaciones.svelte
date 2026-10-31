@@ -5,6 +5,7 @@
   import CampoEstacion from '../componentes/CampoEstacion.svelte';
   import ChipRuta from '../componentes/ChipRuta.svelte';
   import Icono from '../componentes/Icono.svelte';
+  import Segmentado from '../componentes/Segmentado.svelte';
 
   let texto = $state('');
   let elegida = $state('');
@@ -92,10 +93,7 @@
 
             <div class="proximo" style="--c:{colorRuta(rutaElegida)}">
               <div class="hora-fila">
-                <div class="segmentado" role="group" aria-label="Hora">
-                  <button aria-pressed={modoHora === 'ahora'} onclick={() => (modoHora = 'ahora')}>Ahora</button>
-                  <button aria-pressed={modoHora === 'elegir'} onclick={() => (modoHora = 'elegir')}>Otra hora</button>
-                </div>
+                <Segmentado etiqueta="Hora" bind:valor={modoHora} opciones={[{ id: 'ahora', texto: 'Ahora' }, { id: 'elegir', texto: 'Otra hora' }]} />
                 {#if modoHora === 'elegir'}<input class="campo hora-campo num" type="time" bind:value={horaElegida} aria-label="Hora" />{/if}
               </div>
               {#if proximo}
@@ -136,9 +134,7 @@
     <section class="vidrio tarjeta">
       <div class="cabeza-tarjeta">
         <div><p class="etiqueta">Ranking</p><h2 class="titulo">Más buses al día</h2></div>
-        <div class="segmentado" role="group" aria-label="Cuántas estaciones">
-          {#each [5, 10, 20] as n}<button aria-pressed={k === n} onclick={() => (k = n)}>{n}</button>{/each}
-        </div>
+        <Segmentado etiqueta="Cuántas estaciones" bind:valor={k} opciones={[{ id: 5, texto: '5' }, { id: 10, texto: '10' }, { id: 20, texto: '20' }]} />
       </div>
       <ol class="ranking">
         {#each ranking as r, i (r.nombre)}

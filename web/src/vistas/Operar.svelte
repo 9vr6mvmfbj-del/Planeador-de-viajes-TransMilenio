@@ -6,6 +6,7 @@
   import ChipRuta from '../componentes/ChipRuta.svelte';
   import LineaRuta from '../componentes/LineaRuta.svelte';
   import Icono from '../componentes/Icono.svelte';
+  import Segmentado from '../componentes/Segmentado.svelte';
   import { buscar, normalizar } from '../lib/busqueda.js';
 
   // Etiquetas de lo que se hizo, solo para mostrar el historial (el motor guarda las operaciones reales).
@@ -148,10 +149,7 @@
     {#if ruta}
       <div class="cabeza-tarjeta separado">
         <div class="fila-chip"><ChipRuta ruta={ruta} grande /><span class="pequeno tenue num">{recorrido.length} paradas</span></div>
-        <div class="segmentado" role="group" aria-label="Sentido">
-          <button aria-pressed={!alReves} onclick={() => (alReves = false)}>Ida</button>
-          <button aria-pressed={alReves} onclick={() => (alReves = true)}>Al revés</button>
-        </div>
+        <Segmentado etiqueta="Sentido" valor={alReves ? 'reves' : 'ida'} onelegir={(v) => (alReves = v === 'reves')} opciones={[{ id: 'ida', texto: 'Ida' }, { id: 'reves', texto: 'Al revés' }]} />
       </div>
       {#if alReves}<p class="mini tenue">Vista al revés: para editar vuelve a “Ida”.</p>{/if}
 
