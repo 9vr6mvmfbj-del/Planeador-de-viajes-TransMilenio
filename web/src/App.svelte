@@ -4,6 +4,8 @@
   import Navegacion from './componentes/Navegacion.svelte';
   import Avisos from './componentes/Avisos.svelte';
   import Intro from './componentes/Intro.svelte';
+  import Malla from './componentes/Malla.svelte';
+  import { acento } from './lib/acento.svelte.js';
   import Viajar from './vistas/Viajar.svelte';
   import Estaciones from './vistas/Estaciones.svelte';
   import Operar from './vistas/Operar.svelte';
@@ -24,6 +26,8 @@
     }
   });
 </script>
+
+<Malla acento={acento.color} />
 
 {#if intro}<Intro onentrar={() => (intro = false)} />{/if}
 
