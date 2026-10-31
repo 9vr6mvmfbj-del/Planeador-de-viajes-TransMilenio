@@ -118,5 +118,16 @@ export async function cargarMotor(origen) {
     rutas: () => leer(m.m_rutas()),
     cerradas: () => leer(m.m_cerradas()),
     rendimiento: (maxEscala = 8, consultas = 20000) => leer(m.m_rendimiento(maxEscala, consultas)),
+
+    // ---- panel de admin (también entran a deshacer/rehacer) ----
+    crear_estacion: (nombre) => llamar(m.m_crear_estacion, nombre),
+    eliminar_estacion: (nombre) => llamar(m.m_eliminar_estacion, nombre),
+    crear_ruta: (ruta, paradas, primera, ultima, frecuencia, entre) =>
+      llamar(m.m_crear_ruta, ruta, paradas.join('|'), primera, ultima, frecuencia, entre),
+    eliminar_ruta: (ruta) => llamar(m.m_eliminar_ruta, ruta),
+    deshacer_cambio: (i) => leer(m.m_deshacer_cambio(i)),
+    rehacer_cambio: (i) => leer(m.m_rehacer_cambio(i)),
+    historial: () => leer(m.m_historial()),
+    error: () => leer(m.m_error()),
   };
 }

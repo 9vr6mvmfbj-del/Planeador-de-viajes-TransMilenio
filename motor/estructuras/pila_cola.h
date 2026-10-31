@@ -21,6 +21,8 @@ public:
         return x;
     }
     const T& tope() const { return datos_.back(); }
+    // Mirar el elemento i contando desde el tope (0 = tope), sin sacarlo: O(1). Solo para listar el historial.
+    const T& desdeTope(int i) const { return datos_[datos_.size() - 1 - i]; }
     bool vacia() const { return datos_.empty(); }
     int tamano() const { return static_cast<int>(datos_.size()); }
     void vaciar() { datos_.clear(); }

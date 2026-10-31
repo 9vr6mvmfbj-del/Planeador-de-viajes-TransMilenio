@@ -169,6 +169,229 @@ static void pruebasOperacion() {
     CHECK(!red.rehacer());
 }
 
+static vector<int> ids(const vector<Red::Cambio>& v) {
+    vector<int> r;
+    for (const auto& c : v) r.push_back(c.id);
+    return r;
+}
+
+static void pruebasAdmin() {
+    std::printf("Panel de admin: crear/eliminar estaciones y líneas, deshacer cualquier cambio\n");
+    {
+        Red red("/tmp/red_pequena");
+        // crear estación
+        CHECK(red.crear_estacion(" nueva estacion "));
+        CHECK(red.estado("NUEVA ESTACION") == "ABIERTA");
+        CHECK(!red.crear_estacion("NUEVA ESTACION"));  // repetida
+        CHECK(!red.crear_estacion("   "));
+        CHECK(red.autocompletar("NUEVA", 3) == V({"NUEVA ESTACION"}));
+        CHECK(red.rutas_de("NUEVA ESTACION").empty());
+        CHECK(red.deshacer());
+        CHECK(red.estado("NUEVA ESTACION") == "NO EXISTE");
+        CHECK(red.autocompletar("NUEVA", 3).empty());
+        CHECK(red.rehacer());
+        CHECK(red.estado("NUEVA ESTACION") == "ABIERTA");
+    }
+    {
+        Red red("/tmp/red_pequena");
+        int est = red.num_estaciones();
+        // eliminar estación: sale de todas sus rutas, de búsquedas, ranking y viajes
+        CHECK(red.eliminar_estacion("C"));
+        CHECK(!red.eliminar_estacion("C"));
+        CHECK(red.estado("C") == "NO EXISTE");
+        CHECK(red.num_estaciones() == est - 1);
+        CHECK(red.recorrido("R1") == V({"A", "B", "D", "E"}));
+        CHECK(red.recorrido("R2") == V({"X", "Y", "E"}));
+        CHECK(red.ranking(2) == V({"A", "D"}));
+        Viaje v = red.viaje("X", "D");  // ya no hay transbordo en C: X -R2-> E -R3-> D
+        CHECK(v.encontrado && v.paradas == 3 && v.transbordo() == "E");
+        CHECK(red.proximo_bus("C", "R2", "06:00") == "");
+        // deshacer: vuelve en su lugar exacto de cada ruta, con sus buses
+        CHECK(red.deshacer());
+        CHECK(red.estado("C") == "ABIERTA");
+        CHECK(red.recorrido("R1") == V({"A", "B", "C", "D", "E"}));
+        CHECK(red.recorrido("R2") == V({"X", "C", "Y", "E"}));
+        CHECK(red.buses_dia("C") == 3);
+        CHECK(red.ranking(2) == V({"A", "C"}));
+        CHECK(red.viaje("X", "D").paradas == 2);
+        CHECK(red.proximo_bus("C", "R2", "06:00") == "07:00");
+        CHECK(red.rehacer());
+        CHECK(red.estado("C") == "NO EXISTE");
+        CHECK(red.deshacer());
+        // una estación cerrada que se elimina vuelve cerrada
+        CHECK(red.cerrar("C"));
+        CHECK(red.eliminar_estacion("C"));
+        CHECK(red.deshacer());
+        CHECK(red.estado("C") == "CERRADA");
+        CHECK(red.recorrido("R2") == V({"X", "C", "Y", "E"}));
+        CHECK(red.ranking(2) == V({"A", "D"}));  // cerrada: sigue fuera del ranking
+        CHECK(red.deshacer());                   // cerrar C
+        CHECK(red.ranking(2) == V({"A", "C"}));
+        CHECK(red.eliminar_estacion("A"));       // la primera de R1
+        CHECK(red.recorrido("R1") == V({"B", "C", "D", "E"}));
+        CHECK(red.deshacer());
+        CHECK(red.recorrido("R1") == V({"A", "B", "C", "D", "E"}));
+    }
+    {
+        Red red("/tmp/red_pequena");
+        int rutas = red.num_rutas(), horarios = red.num_horarios();
+        // crear línea con horarios generados
+        CHECK(!red.crear_ruta("R1", V({"A", "D"}), "06:00", "07:00", 10, 5));        // nombre repetido
+        CHECK(!red.crear_ruta("NUEVA", V({"A"}), "06:00", "07:00", 10, 5));          // una sola parada
+        CHECK(!red.crear_ruta("NUEVA", V({"A", "NADA"}), "06:00", "07:00", 10, 5));  // no existe
+        CHECK(!red.crear_ruta("NUEVA", V({"A", "D", "A"}), "06:00", "07:00", 10, 5)); // repetida
+        CHECK(!red.crear_ruta("NUEVA", V({"A", "D"}), "6h", "07:00", 10, 5));        // hora mala
+        CHECK(!red.crear_ruta("NUEVA", V({"A", "D"}), "06:00", "07:00", 0, 5));      // frecuencia 0
+        CHECK(red.num_rutas() == rutas);
+        CHECK(red.crear_ruta("nueva", V({"A", "d", "X"}), "06:00", "06:20", 10, 5));
+        CHECK(red.num_rutas() == rutas + 1);
+        CHECK(red.num_horarios() == horarios + 9);
+        CHECK(red.recorrido("NUEVA") == V({"A", "D", "X"}));
+        CHECK(red.recorrido("NUEVA", true) == V({"X", "D", "A"}));
+        CHECK(red.horarios("D", "NUEVA") == V({"06:05", "06:15", "06:25"}));
+        CHECK(red.proximo_bus("D", "NUEVA", "06:06") == "06:15");
+        CHECK(red.proximo_bus("X", "NUEVA", "07:00") == "06:10");  // ya no hay hoy: el primero
+        CHECK(red.buses_dia("A") == 6);
+        Viaje v = red.viaje("A", "X");
+        CHECK(v.encontrado && v.paradas == 2 && v.tramos.size() == 1 && v.tramos[0].ruta == "NUEVA");
+        CHECK(red.deshacer());
+        CHECK(red.num_rutas() == rutas);
+        CHECK(red.num_horarios() == horarios);
+        CHECK(red.recorrido("NUEVA").empty());
+        CHECK(red.proximo_bus("D", "NUEVA", "06:06") == "");
+        CHECK(red.buses_dia("A") == 3);
+        CHECK(red.rehacer());
+        CHECK(red.recorrido("NUEVA") == V({"A", "D", "X"}));
+        CHECK(red.buses_dia("A") == 6);
+        // pasa la medianoche: los horarios quedan ordenados
+        CHECK(red.crear_ruta("NOCHE", V({"A", "B"}), "23:50", "00:10", 10, 15));
+        CHECK(red.horarios("B", "NOCHE") == V({"00:05", "00:15", "00:25"}));
+        CHECK(red.proximo_bus("B", "NOCHE", "00:00") == "00:05");
+    }
+    {
+        Red red("/tmp/red_pequena");
+        int rutas = red.num_rutas();
+        // eliminar línea
+        CHECK(red.eliminar_ruta("R2"));
+        CHECK(!red.eliminar_ruta("R2"));
+        CHECK(red.num_rutas() == rutas - 1);
+        CHECK(red.recorrido("R2").empty());
+        CHECK(red.estado("X") == "ABIERTA");  // la estación sigue, solo sin esa línea
+        CHECK(red.buses_dia("C") == 1);
+        CHECK(!red.viaje("X", "D").encontrado);
+        CHECK(red.rutas_de("C") == V({"R1"}));
+        CHECK(red.deshacer());
+        CHECK(red.recorrido("R2") == V({"X", "C", "Y", "E"}));
+        CHECK(red.buses_dia("C") == 3);
+        CHECK(red.viaje("X", "D").paradas == 2);
+        CHECK(red.num_rutas() == rutas);
+        // una línea eliminada y otra creada con el mismo nombre no se mezclan
+        CHECK(red.eliminar_ruta("R3"));
+        CHECK(red.crear_ruta("R3", V({"A", "B"}), "05:00", "05:00", 10, 1));
+        CHECK(red.recorrido("R3") == V({"A", "B"}));
+        CHECK(red.deshacer());
+        CHECK(red.deshacer());
+        CHECK(red.recorrido("R3") == V({"E", "D"}));
+        CHECK(red.proximo_bus("E", "R3", "07:00") == "08:00");
+    }
+    {
+        Red red("/tmp/red_pequena");
+        // deshacer y rehacer cualquier cambio del historial
+        CHECK(red.cerrar("A"));                    // id 1
+        CHECK(red.quitar_parada("R1", "B"));       // id 2
+        CHECK(red.crear_estacion("W"));            // id 3
+        CHECK(red.agregar_parada("R1", "W", "D")); // id 4
+        CHECK(red.cerrar("Y"));                    // id 5
+        CHECK(ids(red.cambios_hechos()) == std::vector<int>({5, 4, 3, 2, 1}));
+        auto h = red.cambios_hechos();
+        CHECK(h[1].tipo == "AGREGAR" && h[1].estacion == "W" && h[1].ruta == "R1" && h[1].referencia == "D");
+        CHECK(!red.deshacer_cambio(5));
+        CHECK(!red.deshacer_cambio(-1));
+        // deshacer solo "quitar B" (posición 3): B vuelve, todo lo demás sigue hecho
+        CHECK(red.deshacer_cambio(3));
+        CHECK(red.recorrido("R1") == V({"A", "B", "C", "D", "W", "E"}));
+        CHECK(red.estado("A") == "CERRADA" && red.estado("Y") == "CERRADA" && red.estado("W") == "ABIERTA");
+        CHECK(ids(red.cambios_hechos()) == std::vector<int>({5, 4, 3, 1}));
+        CHECK(ids(red.cambios_deshechos()) == std::vector<int>({2}));
+        // "crear W" no se puede deshacer solo: "agregar W" depende de él. No cambia nada.
+        CHECK(!red.deshacer_cambio(2));
+        CHECK(red.conflicto() == 4);
+        CHECK(red.recorrido("R1") == V({"A", "B", "C", "D", "W", "E"}));
+        CHECK(red.estado("W") == "ABIERTA");
+        CHECK(ids(red.cambios_hechos()) == std::vector<int>({5, 4, 3, 1}));
+        // rehacer "quitar B" aunque no sea lo último
+        CHECK(red.rehacer_cambio(0));
+        CHECK(red.recorrido("R1") == V({"A", "C", "D", "W", "E"}));
+        CHECK(ids(red.cambios_hechos()) == std::vector<int>({2, 5, 4, 3, 1}));
+        CHECK(!red.rehacer_cambio(0));
+        // deshacer el más viejo (cerrar A): A se reabre, el resto sigue
+        CHECK(red.deshacer_cambio(4));
+        CHECK(red.estado("A") == "ABIERTA" && red.estado("Y") == "CERRADA");
+        CHECK(red.recorrido("R1") == V({"A", "C", "D", "W", "E"}));
+        // varios deshechos: rehacer el de abajo de la pila de rehacer
+        CHECK(red.deshacer_cambio(0));  // quitar B -> pila de rehacer: [2, 1]
+        CHECK(ids(red.cambios_deshechos()) == std::vector<int>({2, 1}));
+        CHECK(red.rehacer_cambio(1));   // vuelve a cerrar A; "quitar B" sigue para rehacer
+        CHECK(red.estado("A") == "CERRADA");
+        CHECK(ids(red.cambios_deshechos()) == std::vector<int>({2}));
+        CHECK(red.recorrido("R1") == V({"A", "B", "C", "D", "W", "E"}));
+        // y el deshacer/rehacer normal (R9) sigue funcionando encima de todo esto
+        CHECK(red.rehacer());
+        CHECK(red.recorrido("R1") == V({"A", "C", "D", "W", "E"}));
+        CHECK(red.deshacer());
+        CHECK(red.recorrido("R1") == V({"A", "B", "C", "D", "W", "E"}));
+        // un cambio nuevo borra lo que había para rehacer
+        CHECK(red.cerrar("X"));
+        CHECK(!red.puede_rehacer());
+        CHECK(red.cambios_deshechos().empty());
+    }
+    {
+        // Prueba al azar: muchas operaciones mezcladas y luego deshacer todo deja la red como al inicio.
+        Red red("/tmp/red_pequena");
+        std::mt19937 gen(7);
+        vector<string> est = {"A", "B", "C", "D", "E", "X", "Y", "Z", "CALLE 26", "N1", "N2"};
+        vector<string> rut = {"R1", "R2", "R3", "L1", "L2"};
+        auto foto = [&]() {
+            string s;
+            for (const string& r : red.nombres_rutas()) { s += r + ":"; for (const string& e : red.recorrido(r)) s += e + ","; s += ";"; }
+            for (const string& e : est) s += e + "=" + red.estado(e) + std::to_string(red.buses_dia(e)) + ";";
+            for (const string& r : red.ranking(20)) s += r + ",";
+            s += std::to_string(red.num_rutas()) + "/" + std::to_string(red.num_horarios()) + "/" + std::to_string(red.num_estaciones());
+            return s;
+        };
+        string inicio = foto();
+        int hechos = 0;
+        for (int i = 0; i < 400; i++) {
+            const string& e = est[gen() % est.size()];
+            const string& e2 = est[gen() % est.size()];
+            const string& r = rut[gen() % rut.size()];
+            bool ok = false;
+            switch (gen() % 9) {
+                case 0: ok = red.cerrar(e); break;
+                case 1: ok = red.reabrir(e); break;
+                case 2: ok = red.quitar_parada(r, e); break;
+                case 3: ok = red.agregar_parada(r, e, e2); break;
+                case 4: ok = red.crear_estacion(e); break;
+                case 5: ok = red.eliminar_estacion(e); break;
+                case 6: ok = red.crear_ruta(r, V({e, e2}), "06:00", "07:00", 15, 3); break;
+                case 7: ok = red.eliminar_ruta(r); break;
+                case 8: {
+                    int n = static_cast<int>(red.cambios_hechos().size());
+                    if (n) red.deshacer_cambio(static_cast<int>(gen() % n));
+                    break;
+                }
+            }
+            if (ok) hechos++;
+        }
+        CHECK(hechos > 50);
+        while (red.deshacer()) {}
+        CHECK(foto() == inicio);
+        while (red.rehacer()) {}
+        while (red.deshacer()) {}
+        CHECK(foto() == inicio);
+    }
+}
+
 static void pruebasFila() {
     std::printf("Fila de abordaje\n");
     ResultadoFila r = simular_fila({0, 0, 1, 2, 3, 10, 10, 10}, 5, 2);
@@ -235,6 +458,7 @@ static void pruebasViajeReal() {
 int main() {
     pruebasBasicas();
     pruebasOperacion();
+    pruebasAdmin();
     pruebasFila();
     pruebasViajeReal();
     std::printf("\n%d de %d pruebas pasaron%s\n", total - fallas, total, fallas ? "" : " ✔");

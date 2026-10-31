@@ -86,10 +86,40 @@ public:
     std::vector<std::string> estaciones_cerradas() const;  // O(n), solo para la app
     int num_estaciones() const { return estacionesExistentes_; }
     int num_estaciones_abiertas() const { return arbolNombres_.tamano(); }
-    int num_rutas() const { return static_cast<int>(rutas_.size()); }
+    int num_rutas() const { return rutasExistentes_; }
     int num_horarios() const { return totalHorarios_; }
     bool puede_deshacer() const { return !pilaDeshacer_.vacia(); }
     bool puede_rehacer() const { return !pilaRehacer_.vacia(); }
+
+    // ---- Panel de admin (extras, no son parte del contrato) ----
+    // Todos son cambios como los de R7 y R8: entran a la pila de deshacer (R9) y un cambio nuevo
+    // borra la de rehacer. Devuelven false si no se pudo; el motivo queda en ultimo_error().
+    bool crear_estacion(const std::string& nombre);
+    bool eliminar_estacion(const std::string& nombre);  // la quita de todas sus rutas y de la red
+    // Crea una línea con sus paradas en orden y le genera horarios: sale de la primera parada desde
+    // 'primera' hasta 'ultima' cada 'frecuencia' minutos y tarda 'minutosEntreParadas' entre paradas.
+    bool crear_ruta(const std::string& ruta, const std::vector<std::string>& paradas, const std::string& primera,
+                    const std::string& ultima, int frecuencia, int minutosEntreParadas);
+    bool eliminar_ruta(const std::string& ruta);
+
+    // Deshacer / rehacer un cambio cualquiera, no solo el último.
+    // i = posición en la pila contando desde el tope (0 = el más reciente, igual que deshacer()/rehacer()).
+    bool deshacer_cambio(int i);
+    bool rehacer_cambio(int i);
+
+    // Contenido de las pilas para mostrar el historial, del tope a la base.
+    struct Cambio {
+        int id;                  // número del cambio (no cambia aunque se deshaga y rehaga)
+        std::string tipo;        // CERRAR, REABRIR, AGREGAR, QUITAR, CREAR_ESTACION, ELIMINAR_ESTACION, CREAR_RUTA, ELIMINAR_RUTA
+        std::string estacion;    // estación del cambio ("" si es de una ruta)
+        std::string ruta;        // ruta del cambio ("" si es solo de una estación)
+        std::string referencia;  // AGREGAR: después de cuál quedó
+        int cantidad;            // rutas de las que salió la estación / paradas de la ruta
+    };
+    std::vector<Cambio> cambios_hechos() const;     // pila de deshacer
+    std::vector<Cambio> cambios_deshechos() const;  // pila de rehacer
+    const std::string& ultimo_error() const { return error_; }
+    int conflicto() const { return conflicto_; }    // id del cambio que impidió el último deshacer_cambio (-1 si ninguno)
 
 private:
     Red() = default;
@@ -105,7 +135,8 @@ private:
     };
     struct Ruta {
         std::string nombre;
-        int lista;  // índice en listas_
+        int lista;          // índice en listas_
+        bool existe = true; // false si se eliminó desde el panel de admin (se puede deshacer)
     };
     struct ClaveRanking {
         int buses;
@@ -120,13 +151,18 @@ private:
             return a.nombre < b.nombre;
         }
     };
-    enum TipoOp { OP_CERRAR, OP_REABRIR, OP_AGREGAR, OP_QUITAR };
+    enum TipoOp { OP_CERRAR, OP_REABRIR, OP_AGREGAR, OP_QUITAR,
+                  OP_CREAR_ESTACION, OP_ELIMINAR_ESTACION, OP_CREAR_RUTA, OP_ELIMINAR_RUTA };
     struct Operacion {
         TipoOp tipo;
-        int estacion;
+        int estacion = -1;
         int ruta = -1;
         int referencia = -1;  // AGREGAR: estación 'despues_de'. QUITAR: estación anterior (-1 = era la primera)
         bool creoEstacion = false;
+        int id = 0;
+        bool estabaAbierta = true;  // ELIMINAR_ESTACION: para dejarla igual al deshacer
+        std::vector<int> lista;     // ELIMINAR_ESTACION: rutas de las que salió. CREAR/ELIMINAR_RUTA: paradas en orden
+        std::vector<int> previas;   // ELIMINAR_ESTACION: estación anterior en cada una de esas rutas (-1 = era la primera)
     };
 
     static uint64_t par(int ruta, int estacion) {
@@ -147,8 +183,13 @@ private:
     void borrarParada(int r, int e);
     void revivirEstacion(int e);
     void borrarEstacion(int e);
-    void aplicar(const Operacion& op, bool alReves);
-    void registrar(const Operacion& op);
+    void revivirRuta(int r, const std::vector<int>& paradas);
+    void borrarRuta(int r);
+    bool enRuta(int r, int e) const { return nodoDe_.contiene(par(r, e)); }
+    bool aplicarAdelante(Operacion& op);     // valida, recalcula lo que dependa del estado actual y aplica
+    void aplicarAtras(const Operacion& op);  // deshace (siempre válido si se respeta el orden de la pila)
+    void registrar(Operacion& op);
+    Cambio describir(const Operacion& op) const;
 
     std::vector<Estacion> estaciones_;
     std::vector<Ruta> rutas_;
@@ -163,7 +204,11 @@ private:
     Pila<Operacion> pilaDeshacer_;
     Pila<Operacion> pilaRehacer_;
     int estacionesExistentes_ = 0;
+    int rutasExistentes_ = 0;
     int totalHorarios_ = 0;
+    int siguienteId_ = 1;
+    int conflicto_ = -1;
+    std::string error_;
 
     // Arreglos de trabajo de R5 (se reutilizan entre consultas, marcados con 'ronda').
     mutable std::vector<int> marca_, mejorDist_, mejorRuta_, segDist_, segRuta_;

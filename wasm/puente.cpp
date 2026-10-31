@@ -94,6 +94,44 @@ EXPORTAR const char* m_estacion(const char* n) {
                     ",\"buses\":" + std::to_string(red->buses_dia(n)) + ",\"rutas\":" + lista(red->rutas_de(n)) + "}";
     return devolver(s);
 }
+// ---- panel de admin ----
+static std::vector<std::string> partir(const std::string& s, char sep) {
+    std::vector<std::string> v;
+    std::string actual;
+    for (char c : s) {
+        if (c == sep) { v.push_back(actual); actual.clear(); }
+        else actual += c;
+    }
+    if (!actual.empty()) v.push_back(actual);
+    return v;
+}
+static std::string cambios(const std::vector<Red::Cambio>& v) {
+    std::string s = "[";
+    for (size_t i = 0; i < v.size(); i++) {
+        const Red::Cambio& c = v[i];
+        if (i) s += ",";
+        s += "{\"id\":" + std::to_string(c.id) + ",\"tipo\":" + esc(c.tipo) + ",\"estacion\":" + esc(c.estacion) +
+             ",\"ruta\":" + esc(c.ruta) + ",\"referencia\":" + esc(c.referencia) +
+             ",\"cantidad\":" + std::to_string(c.cantidad) + "}";
+    }
+    return s + "]";
+}
+EXPORTAR const char* m_crear_estacion(const char* n) { return booleano(red->crear_estacion(n)); }
+EXPORTAR const char* m_eliminar_estacion(const char* n) { return booleano(red->eliminar_estacion(n)); }
+// 'paradas' llega separado por '|' (ningún nombre de estación lo usa)
+EXPORTAR const char* m_crear_ruta(const char* r, const char* paradas, const char* primera, const char* ultima, int frecuencia, int entre) {
+    return booleano(red->crear_ruta(r, partir(paradas, '|'), primera, ultima, frecuencia, entre));
+}
+EXPORTAR const char* m_eliminar_ruta(const char* r) { return booleano(red->eliminar_ruta(r)); }
+EXPORTAR const char* m_deshacer_cambio(int i) { return booleano(red->deshacer_cambio(i)); }
+EXPORTAR const char* m_rehacer_cambio(int i) { return booleano(red->rehacer_cambio(i)); }
+EXPORTAR const char* m_historial() {
+    return devolver("{\"hechos\":" + cambios(red->cambios_hechos()) + ",\"deshechos\":" + cambios(red->cambios_deshechos()) + "}");
+}
+EXPORTAR const char* m_error() {
+    return devolver("{\"error\":" + esc(red->ultimo_error()) + ",\"conflicto\":" + std::to_string(red->conflicto()) + "}");
+}
+
 EXPORTAR const char* m_horarios(const char* e, const char* r) { return devolver(lista(red->horarios(e, r))); }
 EXPORTAR const char* m_rutas() { return devolver(lista(red->nombres_rutas())); }
 EXPORTAR const char* m_cerradas() { return devolver(lista(red->estaciones_cerradas())); }

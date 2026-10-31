@@ -205,6 +205,7 @@ int Red::crearRuta(const std::string& nombre) {
     rutas_.push_back(r);
     int id = static_cast<int>(rutas_.size()) - 1;
     idRuta_.poner(nombre, id);
+    rutasExistentes_++;
     return id;
 }
 
@@ -286,29 +287,131 @@ void Red::borrarEstacion(int e) {
     estacionesExistentes_--;
 }
 
-void Red::registrar(const Operacion& op) {
+// Una ruta vuelve a la red con estas paradas en orden (sus horarios nunca se borraron). O(P).
+void Red::revivirRuta(int r, const std::vector<int>& paradas) {
+    Ruta& ruta = rutas_[r];
+    ruta.existe = true;
+    idRuta_.poner(ruta.nombre, r);
+    rutasExistentes_++;
+    int previa = -1;
+    for (int e : paradas) {
+        insertarParada(r, e, previa);  // suma sus buses al ranking
+        totalHorarios_ += cantidadHorarios(r, e);
+        previa = e;
+    }
+}
+
+// Saca la ruta de la red: quita todas sus paradas (restando sus buses) y su nombre de la tabla. O(P).
+void Red::borrarRuta(int r) {
+    Ruta& ruta = rutas_[r];
+    int m = listas_.lista(ruta.lista).cabeza;
+    while (m != -1) {
+        int e = listas_.nodo(m).estacion;
+        m = listas_.nodo(m).siguiente;  // se lee antes de quitar el nodo
+        totalHorarios_ -= cantidadHorarios(r, e);
+        borrarParada(r, e);
+    }
+    idRuta_.borrar(ruta.nombre);
+    ruta.existe = false;
+    rutasExistentes_--;
+}
+
+void Red::registrar(Operacion& op) {
+    op.id = siguienteId_++;
     pilaDeshacer_.apilar(op);
     pilaRehacer_.vaciar();  // un cambio nuevo borra lo que había para rehacer
 }
 
-// Aplica una operación (alReves = false) o la deshace (alReves = true).
-void Red::aplicar(const Operacion& op, bool alReves) {
+// Aplica una operación hacia adelante (hacer o rehacer). Primero revisa que tenga sentido en el estado
+// actual: con deshacer/rehacer en orden de pila siempre lo tiene, pero al deshacer o rehacer un cambio
+// del medio (deshacer_cambio) puede que ya no (ej. agregar una parada a una ruta que ya no existe).
+// Si no se puede, devuelve false sin tocar nada. Lo que depende del estado (la estación anterior,
+// las rutas de una estación, las paradas de una ruta) se recalcula aquí, no se confía en lo guardado.
+bool Red::aplicarAdelante(Operacion& op) {
+    auto viva = [&](int e) { return e >= 0 && estaciones_[e].existe; };
+    auto rutaViva = [&](int r) { return r >= 0 && rutas_[r].existe; };
     switch (op.tipo) {
-        case OP_CERRAR: ponerAbierta(op.estacion, alReves); break;
-        case OP_REABRIR: ponerAbierta(op.estacion, !alReves); break;
+        case OP_CERRAR:
+            if (!viva(op.estacion) || !estaciones_[op.estacion].abierta) return false;
+            ponerAbierta(op.estacion, false);
+            return true;
+        case OP_REABRIR:
+            if (!viva(op.estacion) || estaciones_[op.estacion].abierta) return false;
+            ponerAbierta(op.estacion, true);
+            return true;
         case OP_AGREGAR:
-            if (alReves) {
-                borrarParada(op.ruta, op.estacion);
-                if (op.creoEstacion) borrarEstacion(op.estacion);
-            } else {
-                if (op.creoEstacion) revivirEstacion(op.estacion);
-                insertarParada(op.ruta, op.estacion, op.referencia);
+            if (!rutaViva(op.ruta) || !viva(op.referencia) || !enRuta(op.ruta, op.referencia)) return false;
+            if (op.creoEstacion) {
+                if (viva(op.estacion) || idEstacion(estaciones_[op.estacion].nombre) >= 0) return false;
+                revivirEstacion(op.estacion);
+            } else if (!viva(op.estacion) || enRuta(op.ruta, op.estacion)) {
+                return false;
             }
+            insertarParada(op.ruta, op.estacion, op.referencia);
+            return true;
+        case OP_QUITAR: {
+            if (!rutaViva(op.ruta) || !viva(op.estacion) || !enRuta(op.ruta, op.estacion)) return false;
+            int anterior = listas_.nodo(*nodoDe_.buscar(par(op.ruta, op.estacion))).anterior;
+            op.referencia = anterior == -1 ? -1 : listas_.nodo(anterior).estacion;
+            borrarParada(op.ruta, op.estacion);
+            return true;
+        }
+        case OP_CREAR_ESTACION:
+            if (viva(op.estacion) || idEstacion(estaciones_[op.estacion].nombre) >= 0) return false;
+            revivirEstacion(op.estacion);
+            return true;
+        case OP_ELIMINAR_ESTACION: {
+            if (!viva(op.estacion)) return false;
+            Estacion& est = estaciones_[op.estacion];
+            op.estabaAbierta = est.abierta;
+            op.lista = est.rutas;  // copia: borrarParada va cambiando est.rutas
+            op.previas.clear();
+            for (int r : op.lista) {
+                int anterior = listas_.nodo(*nodoDe_.buscar(par(r, op.estacion))).anterior;
+                op.previas.push_back(anterior == -1 ? -1 : listas_.nodo(anterior).estacion);
+                borrarParada(r, op.estacion);
+            }
+            borrarEstacion(op.estacion);
+            return true;
+        }
+        case OP_CREAR_RUTA:
+            if (rutaViva(op.ruta) || idRuta(rutas_[op.ruta].nombre) >= 0) return false;
+            for (int e : op.lista)
+                if (!viva(e)) return false;
+            revivirRuta(op.ruta, op.lista);
+            return true;
+        case OP_ELIMINAR_RUTA: {
+            if (!rutaViva(op.ruta)) return false;
+            op.lista.clear();  // paradas actuales, en orden, para poder devolverlas
+            int m = listas_.lista(rutas_[op.ruta].lista).cabeza;
+            while (m != -1) { op.lista.push_back(listas_.nodo(m).estacion); m = listas_.nodo(m).siguiente; }
+            borrarRuta(op.ruta);
+            return true;
+        }
+    }
+    return false;
+}
+
+// Deshace una operación. Se llama solo en orden de pila (la más nueva primero), así que el estado es
+// exactamente el que dejó la operación y todo lo guardado en ella sigue siendo válido.
+void Red::aplicarAtras(const Operacion& op) {
+    switch (op.tipo) {
+        case OP_CERRAR: ponerAbierta(op.estacion, true); break;
+        case OP_REABRIR: ponerAbierta(op.estacion, false); break;
+        case OP_AGREGAR:
+            borrarParada(op.ruta, op.estacion);
+            if (op.creoEstacion) borrarEstacion(op.estacion);
             break;
-        case OP_QUITAR:
-            if (alReves) insertarParada(op.ruta, op.estacion, op.referencia);
-            else borrarParada(op.ruta, op.estacion);
+        case OP_QUITAR: insertarParada(op.ruta, op.estacion, op.referencia); break;
+        case OP_CREAR_ESTACION: borrarEstacion(op.estacion); break;
+        case OP_ELIMINAR_ESTACION:
+            revivirEstacion(op.estacion);  // vuelve abierta y a los árboles
+            for (int i = static_cast<int>(op.lista.size()) - 1; i >= 0; i--)
+                insertarParada(op.lista[i], op.estacion, op.previas[i]);
+            if (!op.estabaAbierta) ponerAbierta(op.estacion, false);
             break;
+        case OP_CREAR_RUTA: borrarRuta(op.ruta); break;
+        case OP_ELIMINAR_RUTA: revivirRuta(op.ruta, op.lista); break;
     }
 }
 
@@ -530,7 +633,7 @@ bool Red::reabrir(const std::string& nombre) {
 bool Red::deshacer() {
     if (pilaDeshacer_.vacia()) return false;
     Operacion op = pilaDeshacer_.desapilar();
-    aplicar(op, true);
+    aplicarAtras(op);
     pilaRehacer_.apilar(op);
     return true;
 }
@@ -538,9 +641,185 @@ bool Red::deshacer() {
 bool Red::rehacer() {
     if (pilaRehacer_.vacia()) return false;
     Operacion op = pilaRehacer_.desapilar();
-    aplicar(op, false);
+    if (!aplicarAdelante(op)) {  // solo pasa si antes se deshizo un cambio del medio y este dependía de él
+        pilaRehacer_.apilar(op);
+        error_ = "Ese cambio ya no se puede rehacer: la red cambió";
+        return false;
+    }
     pilaDeshacer_.apilar(op);
     return true;
+}
+
+// ----------------------------------------------------------------- panel de admin
+// Deshacer el cambio i (contando desde el tope) sin perder los que se hicieron después:
+//   1. se desapilan los i cambios de encima y se deshacen, guardándolos en una pila auxiliar;
+//   2. se deshace el elegido y pasa a la pila de rehacer;
+//   3. se vuelven a aplicar los de la pila auxiliar, del más viejo al más nuevo.
+// Si alguno de esos ya no se puede aplicar (dependía del elegido, ej. una parada agregada a una
+// estación creada en el cambio elegido), se devuelve todo a como estaba y se avisa cuál lo impide.
+// Costo: O(i · c), c = costo de aplicar un cambio. i = 0 es exactamente deshacer().
+bool Red::deshacer_cambio(int i) {
+    conflicto_ = -1;
+    error_.clear();
+    if (i < 0 || i >= pilaDeshacer_.tamano()) { error_ = "Ese cambio no está en el historial"; return false; }
+    if (i == 0) return deshacer();
+    Pila<Operacion> encima;
+    for (int j = 0; j < i; j++) {
+        Operacion op = pilaDeshacer_.desapilar();
+        aplicarAtras(op);
+        encima.apilar(op);  // al final el tope de 'encima' es el más viejo de ellos
+    }
+    Operacion elegido = pilaDeshacer_.desapilar();
+    aplicarAtras(elegido);
+    int reaplicados = 0;
+    while (!encima.vacia()) {
+        Operacion op = encima.desapilar();
+        if (aplicarAdelante(op)) {
+            pilaDeshacer_.apilar(op);
+            reaplicados++;
+            continue;
+        }
+        // Conflicto: se deja todo exactamente como estaba.
+        conflicto_ = op.id;
+        error_ = "No se puede deshacer solo ese cambio: un cambio posterior depende de él";
+        encima.apilar(op);
+        for (int j = 0; j < reaplicados; j++) {
+            Operacion r = pilaDeshacer_.desapilar();
+            aplicarAtras(r);
+            encima.apilar(r);
+        }
+        aplicarAdelante(elegido);
+        pilaDeshacer_.apilar(elegido);
+        while (!encima.vacia()) {
+            Operacion r = encima.desapilar();
+            aplicarAdelante(r);
+            pilaDeshacer_.apilar(r);
+        }
+        return false;
+    }
+    pilaRehacer_.apilar(elegido);
+    return true;
+}
+
+// Rehacer el cambio i de la pila de rehacer (desde el tope). Los de encima se apartan en una pila
+// auxiliar y vuelven a su lugar, así siguen disponibles para rehacer. O(i · c).
+bool Red::rehacer_cambio(int i) {
+    conflicto_ = -1;
+    error_.clear();
+    if (i < 0 || i >= pilaRehacer_.tamano()) { error_ = "Ese cambio no está para rehacer"; return false; }
+    Pila<Operacion> encima;
+    for (int j = 0; j < i; j++) encima.apilar(pilaRehacer_.desapilar());
+    Operacion elegido = pilaRehacer_.desapilar();
+    bool ok = aplicarAdelante(elegido);
+    if (ok) pilaDeshacer_.apilar(elegido);
+    else {
+        pilaRehacer_.apilar(elegido);
+        error_ = "Ese cambio ya no se puede rehacer: la red cambió";
+    }
+    while (!encima.vacia()) pilaRehacer_.apilar(encima.desapilar());
+    return ok;
+}
+
+bool Red::crear_estacion(const std::string& nombre) {
+    error_.clear();
+    std::string n = normalizar(nombre);
+    if (n.empty()) { error_ = "Escribe un nombre"; return false; }
+    if (idEstacion(n) >= 0) { error_ = "Ya existe una estación con ese nombre"; return false; }
+    int e = crearEstacion(n);
+    meterEnArboles(e);
+    Operacion op;
+    op.tipo = OP_CREAR_ESTACION; op.estacion = e;
+    registrar(op);
+    return true;
+}
+
+bool Red::eliminar_estacion(const std::string& nombre) {
+    error_.clear();
+    int e = idEstacion(normalizar(nombre));
+    if (e < 0) { error_ = "Esa estación no existe"; return false; }
+    Operacion op;
+    op.tipo = OP_ELIMINAR_ESTACION; op.estacion = e;
+    aplicarAdelante(op);  // guarda sus rutas y la estación anterior en cada una
+    registrar(op);
+    return true;
+}
+
+bool Red::crear_ruta(const std::string& ruta, const std::vector<std::string>& paradas, const std::string& primera,
+                     const std::string& ultima, int frecuencia, int minutosEntreParadas) {
+    error_.clear();
+    std::string n = normalizar(ruta);
+    int ini = aMinutos(primera), fin = aMinutos(ultima);
+    if (n.empty()) { error_ = "Escribe el nombre de la línea"; return false; }
+    if (idRuta(n) >= 0) { error_ = "Ya existe una línea con ese nombre"; return false; }
+    if (paradas.size() < 2) { error_ = "La línea necesita al menos 2 paradas"; return false; }
+    if (ini < 0 || fin < 0) { error_ = "Hora inválida (usa HH:MM)"; return false; }
+    if (frecuencia < 1 || frecuencia > 720) { error_ = "La frecuencia va de 1 a 720 minutos"; return false; }
+    if (minutosEntreParadas < 0 || minutosEntreParadas > 120) { error_ = "Los minutos entre paradas van de 0 a 120"; return false; }
+    // Paradas: deben existir y no repetirse. 'visto' marca por id de estación: O(P) sin buscar en listas.
+    std::vector<int> ids;
+    std::vector<char> visto(estaciones_.size(), 0);
+    for (const std::string& p : paradas) {
+        int e = idEstacion(normalizar(p));
+        if (e < 0) { error_ = "No existe la estación " + normalizar(p); return false; }
+        if (visto[e]) { error_ = "La estación " + estaciones_[e].nombre + " está repetida"; return false; }
+        visto[e] = 1;
+        ids.push_back(e);
+    }
+    if (fin < ini) fin += 1440;  // pasa la medianoche
+    int r = crearRuta(n);
+    // Horarios: un bus sale de la primera parada cada 'frecuencia' minutos y llega a la parada j
+    // j·minutosEntreParadas minutos después (módulo 24 h, igual que las horas >= 24 del GTFS).
+    for (size_t j = 0; j < ids.size(); j++) {
+        int idx = static_cast<int>(horarios_.size());
+        horarios_.push_back(std::vector<int>());
+        horariosDe_.poner(par(r, ids[j]), idx);
+        for (int t = ini; t <= fin; t += frecuencia)
+            horarios_[idx].push_back((t + static_cast<int>(j) * minutosEntreParadas) % 1440);
+        ordenarMezcla(horarios_[idx], [](int a, int b) { return a < b; });  // por si alguno pasó la medianoche
+        totalHorarios_ += static_cast<int>(horarios_[idx].size());
+    }
+    int previa = -1;
+    for (int e : ids) { insertarParada(r, e, previa); previa = e; }
+    Operacion op;
+    op.tipo = OP_CREAR_RUTA; op.ruta = r; op.lista = ids;
+    registrar(op);
+    return true;
+}
+
+bool Red::eliminar_ruta(const std::string& ruta) {
+    error_.clear();
+    int r = idRuta(normalizar(ruta));
+    if (r < 0) { error_ = "Esa línea no existe"; return false; }
+    Operacion op;
+    op.tipo = OP_ELIMINAR_RUTA; op.ruta = r;
+    aplicarAdelante(op);  // guarda sus paradas en orden
+    registrar(op);
+    return true;
+}
+
+Red::Cambio Red::describir(const Operacion& op) const {
+    static const char* const TIPOS[] = {"CERRAR", "REABRIR", "AGREGAR", "QUITAR",
+                                        "CREAR_ESTACION", "ELIMINAR_ESTACION", "CREAR_RUTA", "ELIMINAR_RUTA"};
+    Cambio c;
+    c.id = op.id;
+    c.tipo = TIPOS[op.tipo];
+    c.estacion = op.estacion >= 0 ? estaciones_[op.estacion].nombre : "";
+    c.ruta = op.ruta >= 0 ? rutas_[op.ruta].nombre : "";
+    c.referencia = (op.tipo == OP_AGREGAR && op.referencia >= 0) ? estaciones_[op.referencia].nombre : "";
+    c.cantidad = static_cast<int>(op.lista.size());
+    return c;
+}
+
+std::vector<Red::Cambio> Red::cambios_hechos() const {
+    std::vector<Cambio> res;
+    for (int i = 0; i < pilaDeshacer_.tamano(); i++) res.push_back(describir(pilaDeshacer_.desdeTope(i)));
+    return res;
+}
+
+std::vector<Red::Cambio> Red::cambios_deshechos() const {
+    std::vector<Cambio> res;
+    for (int i = 0; i < pilaRehacer_.tamano(); i++) res.push_back(describir(pilaRehacer_.desdeTope(i)));
+    return res;
 }
 
 // ----------------------------------------------------------------- extras para la app
@@ -570,7 +849,8 @@ std::vector<std::string> Red::horarios(const std::string& estacion, const std::s
 
 std::vector<std::string> Red::nombres_rutas() const {
     std::vector<std::string> res;
-    for (const Ruta& r : rutas_) res.push_back(r.nombre);
+    for (const Ruta& r : rutas_)
+        if (r.existe) res.push_back(r.nombre);
     ordenarTexto(res);
     return res;
 }
