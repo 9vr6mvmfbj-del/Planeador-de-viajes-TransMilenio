@@ -14,6 +14,17 @@
 
   onMount(iniciar);
 
+  // Cambio de pestaña con fundido cruzado (como iOS): la vista que sale se desvanece encima mientras la
+  // nueva aparece y sube un poco. Solo opacidad y transform: corre en la GPU aunque la vista nueva tarde.
+  const reducido = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const curva = (t) => 1 - Math.pow(1 - t, 4); // salida rápida y llegada suave
+  function entrar(_n) {
+    return { duration: reducido ? 120 : 340, easing: curva, css: (t) => reducido ? `opacity:${t}` : `opacity:${t};transform:translate3d(0,${(1 - t) * 10}px,0) scale(${0.985 + 0.015 * t})` };
+  }
+  function salir(_n) {
+    return { duration: reducido ? 100 : 180, css: (t) => `opacity:${t}` };
+  }
+
   // Pantalla de entrada: se muestra al abrir la app (el motor carga mientras tanto).
   let intro = $state(true);
 
@@ -49,7 +60,7 @@
       </div>
     {:else}
       {#key app.vista}
-        <div class="vista">
+        <div class="vista" in:entrar out:salir onoutrostart={(e) => e.currentTarget.classList.add('saliendo')}>
           {#if app.vista === 'viajar'}<Viajar />
           {:else if app.vista === 'estaciones'}<Estaciones />
           {:else if app.vista === 'admin'}<Admin />
@@ -85,8 +96,9 @@
     mask-image: linear-gradient(#000 60%, transparent);
   }
 
-  .vista { animation: entrar 260ms var(--salida) both; }
-  @keyframes entrar { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  main { position: relative; }
+  /* la que sale queda encima, quieta, mientras se desvanece */
+  .vista:global(.saliendo) { position: absolute; inset: 0 0 auto 0; pointer-events: none; z-index: 1; }
 
   .carga { min-height: 60dvh; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; }
   .anillo {

@@ -396,6 +396,20 @@
     contain: layout style;    /* lo que pase adentro no obliga a recalcular la página */
   }
   .cristal { position: absolute; inset: 0; border-radius: inherit; }
+  /* borde de luz del vidrio (como el de iOS): más fuerte arriba a la izquierda y abajo a la derecha */
+  .barra::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    z-index: 3;
+    background: linear-gradient(125deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0.05) 70%, rgba(255, 255, 255, 0.6));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
 
   /* ---------------- la lente: tamaño fijo (una pestaña); todo lo demás es transform */
   .lente {
@@ -416,9 +430,12 @@
   /* levantada: vidrio claro con borde de luz y sombra suave (sin filtros: se compone en la GPU) */
   .lupa {
     opacity: 0;
+    /* vidrio de verdad: desenfoca y satura lo que tiene detrás, con un tinte muy leve */
+    -webkit-backdrop-filter: blur(3px) saturate(200%) brightness(1.08);
+    backdrop-filter: blur(3px) saturate(200%) brightness(1.08);
     background:
-      radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12) 60%),
-      rgba(255, 255, 255, 0.28);
+      radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.06) 62%),
+      rgba(255, 255, 255, 0.14);
     box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 8px 22px rgba(31, 38, 60, 0.16), 0 1px 3px rgba(0, 0, 0, 0.08);
   }
   .brillo {
@@ -460,6 +477,7 @@
       box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 8px 22px rgba(0, 0, 0, 0.5);
     }
     .brillo { box-shadow: inset 0 0 0 0.6px rgba(255, 255, 255, 0.3), inset 0 1.2px 1px rgba(255, 255, 255, 0.35); }
+    .barra::after { opacity: 0.35; }
   }
 
   @media (min-width: 980px) {
