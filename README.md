@@ -30,7 +30,7 @@ nada de los requisitos por su cuenta:
 |---|---|
 | Viajar | R5 viaje, R2 autocompletar, R4 próximo bus de cada tramo |
 | Estaciones | R1 estado, R2, R3 rango, R4 próximo bus y horarios, R6 ranking |
-| Operar | R7 editar rutas y recorrido, R8 cerrar/reabrir, R9 deshacer/rehacer |
+| Admin (con PIN) | Crear/eliminar estaciones y líneas, R7 editar recorridos, R8 cerrar/reabrir, R9 historial con deshacer/rehacer de cualquier cambio |
 | Fila | R10 simular_fila (hasta 800.000 pasajeros) |
 | Rendimiento | R11 panel: n, 2n… 16n por operación, con la curva esperada |
 
@@ -42,7 +42,7 @@ sin zoom al escribir y animaciones con las curvas de Emil Kowalski (respetan "re
 ## Comandos del motor
 
 ```bash
-make pruebas       # 502 pruebas: casos borde de R1–R10 y R5 contra fuerza bruta en la red real
+make pruebas       # 636 pruebas: casos borde de R1–R10, panel de admin y R5 contra fuerza bruta en la red real
 make rendimiento   # mide cómo crece cada operación al duplicar la red (n, 2n, 4n, 8n, 16n)
 make prohibidos    # revisa que motor/ no use nada prohibido
 make wasm          # compila el motor a WebAssembly para la app (clang + wasi-libc)
@@ -219,6 +219,38 @@ contrario. **Un cambio nuevo vacía la pila de rehacer.** **Descartado:** guarda
 > **README:** R9 usa dos pilas propias de operaciones (cerrar, reabrir, agregar y quitar parada con su
 > parada anterior). Deshacer/rehacer es O(1) más el costo de la operación inversa (O(log n) como mucho).
 > Un cambio nuevo vacía la pila de rehacer. Descartamos guardar copias de la red (O(n) por cambio).
+
+### Panel de admin — mismas pilas de R9 + pila auxiliar para deshacer un cambio del medio
+El profesor sugirió separar lo de un usuario común de lo de quien opera la red. La pestaña **Admin**
+pide un PIN para entrar y **otra vez en cada cambio**. Ahí se crean y eliminan estaciones, se crean
+líneas (con horarios generados: primer bus, último bus, frecuencia y minutos entre paradas) y se
+eliminan líneas. Estas funciones son extras del motor (`crear_estacion`, `eliminar_estacion`,
+`crear_ruta`, `eliminar_ruta`), no cambian el contrato, y **entran a las mismas pilas de R9**.
+
+- **Eliminar** no borra datos: marca la estación o la línea como inexistente y la saca de las tablas,
+  los dos AVL y las listas de sus rutas, guardando en la operación lo necesario para devolverla
+  (de qué rutas salió y cuál era la parada anterior en cada una). Así deshacer la deja exactamente
+  donde estaba, con sus horarios. Eliminar una estación con R rutas cuesta O(R · log n).
+- **Deshacer cualquier cambio** (`deshacer_cambio(i)`, i contado desde el tope): se desapilan los i
+  cambios de encima deshaciéndolos hacia una **pila auxiliar**, se deshace el elegido y se vuelven a
+  aplicar los de la auxiliar del más viejo al más nuevo. Si alguno ya no se puede aplicar porque
+  dependía del elegido (ej. agregar una parada a una estación creada en ese cambio), se devuelve todo a
+  como estaba y el motor dice cuál cambio lo impide. Costo O(i · c). `rehacer_cambio(i)` aparta los de
+  encima de la pila de rehacer igual. **Descartado:** reconstruir la red desde cero sin ese cambio
+  (O(tamaño de la red) cada vez y se perderían las pilas de R9).
+- **Persistencia:** la red original son los CSV y cada cambio se guarda como un registro
+  `{ op, args, fecha }`. Al abrir la app, el motor carga los CSV y vuelve a aplicar los registros en
+  orden; como es determinista, queda igual que antes, pilas incluidas. Hoy el registro vive en el
+  navegador (`localStorage`); `supabase/transmitrack.sql` deja lista la tabla compartida con el PIN
+  validado en el servidor, para cuando se active.
+- **PIN:** la app no guarda el PIN, solo su huella PBKDF2-SHA256 (150.000 vueltas). Ojo: mientras viva
+  solo en el navegador es una barrera de uso, no seguridad real; la real es la versión con Supabase.
+
+> **README:** El panel de admin usa las mismas dos pilas de R9. Para deshacer un cambio que no es el
+> último usamos una pila auxiliar: deshacemos los i de encima guardándolos en ella, deshacemos el
+> elegido y volvemos a aplicar los guardados; si alguno dependía del elegido se cancela todo. O(i · c).
+> Eliminar estaciones y líneas guarda lo necesario para devolverlas a su lugar exacto. Descartamos
+> reconstruir la red sin ese cambio porque cuesta O(n) cada vez y perdería las pilas.
 
 ### R10 · Fila de abordaje — Cola FIFO en arreglo circular · O(P)
 Los pasajeros entran a la cola al llegar y los buses (en los minutos 0, f, 2f, …) sacan hasta

@@ -25,6 +25,12 @@
     ruta: 'M5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm14-10a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM7 17h7a3 3 0 0 0 0-6h-4a3 3 0 0 1 0-6h7',
     rayo: 'M13 2 4 14h7l-1 8 9-12h-7l1-8Z',
     info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-5v-5m0-3h.01',
+    basura: 'M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3',
+    subir: 'm6 15 6-6 6 6',
+    bajar: 'm6 9 6 6 6-6',
+    abierto: 'M7 11V8a5 5 0 0 1 9.6-2M6 11h12v9H6z',
+    borrar: 'M9 6h11v12H9l-6-6 6-6ZM13 10l4 4M17 10l-4 4',
+    historial: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2',
     invertir: 'M4 8h13l-3-3M20 16H7l3 3',
   };
 </script>

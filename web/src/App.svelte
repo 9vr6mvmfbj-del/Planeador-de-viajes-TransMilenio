@@ -8,7 +8,7 @@
   import { acento } from './lib/acento.svelte.js';
   import Viajar from './vistas/Viajar.svelte';
   import Estaciones from './vistas/Estaciones.svelte';
-  import Operar from './vistas/Operar.svelte';
+  import Admin from './vistas/Admin.svelte';
   import Fila from './vistas/Fila.svelte';
   import Rendimiento from './vistas/Rendimiento.svelte';
 
@@ -52,7 +52,7 @@
         <div class="vista">
           {#if app.vista === 'viajar'}<Viajar />
           {:else if app.vista === 'estaciones'}<Estaciones />
-          {:else if app.vista === 'operar'}<Operar />
+          {:else if app.vista === 'admin'}<Admin />
           {:else if app.vista === 'fila'}<Fila />
           {:else}<Rendimiento />{/if}
         </div>
