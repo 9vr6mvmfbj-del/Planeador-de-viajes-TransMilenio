@@ -9,6 +9,7 @@ export const app = $state({
   resumen: { estaciones: 0, abiertas: 0, rutas: 0, horarios: 0, puedeDeshacer: false, puedeRehacer: false },
   vista: 'viajar',
   rutas: /** @type {string[]} */ ([]),
+  servicio: { inicio: 4 * 60, fin: 24 * 60 }, // jornada de TransMilenio (min, sobre el eje de la jornada); se calcula de los horarios
 });
 
 /** @type {Awaited<ReturnType<typeof cargarMotor>> | null} */
@@ -32,6 +33,7 @@ export async function iniciar() {
     ]);
     red = m;
     csv = { e, r, h };
+    app.servicio = jornada(h);
     red.cargar(e, r, h);
     reaplicarGuardados();
     app.resumen = red.resumen();
@@ -222,6 +224,54 @@ export function sumarMinutos(hhmm, min) {
 export function minutosEntre(desde, hasta) {
   const a = desde.split(':').map(Number), b = hasta.split(':').map(Number);
   return (((b[0] * 60 + b[1]) - (a[0] * 60 + a[1])) % 1440 + 1440) % 1440;
+}
+
+// ================================================================= jornada de servicio
+// TransMilenio no opera 24 horas: abre hacia las 04:00 y los últimos buses pasan poco después de la
+// medianoche (las horas 24:xx del GTFS). El motor (R4) responde "el próximo bus" de forma circular, como
+// pide el enunciado; la app usa la jornada para decir "fuera de servicio" o "mañana" en vez de
+// "en 10 h 54 min". La jornada sale de los mismos horarios, no de un número fijo.
+const CORTE = 3 * 60; // las 00:00–02:59 cuentan como el final de la jornada anterior
+const aJornada = (m) => (m < CORTE ? m + 1440 : m);
+const aMin = (hhmm) => { const [h, m] = String(hhmm).split(':').map(Number); return h * 60 + m; };
+export const horaDeJornada = (m) => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+
+function jornada(textoHorarios) {
+  let inicio = Infinity, fin = -Infinity;
+  const lineas = textoHorarios.split('\n');
+  const cab = lineas[0].split(',').map((x) => x.trim().toLowerCase());
+  const c = Math.max(0, cab.indexOf('hora'));
+  for (let i = 1; i < lineas.length; i++) {
+    const v = lineas[i].split(',')[c];
+    if (!v || v.indexOf(':') < 0) continue;
+    const m = aJornada(aMin(v) % 1440);
+    if (m < inicio) inicio = m;
+    if (m > fin) fin = m;
+  }
+  return isFinite(inicio) ? { inicio, fin } : { inicio: 4 * 60, fin: 24 * 60 };
+}
+
+export function enServicio(hhmm) {
+  const m = aJornada(aMin(hhmm));
+  return m >= app.servicio.inicio && m <= app.servicio.fin;
+}
+
+/**
+ * Cómo decir la espera hasta el próximo bus que dio el motor (R4).
+ * @returns {{ texto: string, tipo: 'ya'|'pronto'|'hoy'|'manana', minutos: number }}
+ */
+export function espera(hora, proximo) {
+  const h = aJornada(aMin(hora)), p = aJornada(aMin(proximo));
+  const abierto = h >= app.servicio.inicio && h <= app.servicio.fin;
+  if (abierto && p >= h) {
+    const min = p - h;
+    return { texto: min === 0 ? 'ya pasa' : `en ${duracion(min)}`, tipo: min <= 5 ? 'pronto' : 'hoy', minutos: min };
+  }
+  // ya no pasa en esta jornada, o el sistema está cerrado: el próximo es el de la siguiente jornada
+  const mismoDia = aMin(proximo) > aMin(hora); // de madrugada el primer bus todavía es "hoy"
+  const cuando = `${mismoDia ? 'hoy' : 'mañana'} a las ${proximo}`;
+  const texto = abierto ? `ya no pasa ${h >= 1440 ? 'esta noche' : 'hoy'} · ${cuando}` : cuando;
+  return { texto, tipo: 'manana', minutos: -1 };
 }
 
 // Minutos legibles: 45 → "45 min", 60 → "1 h", 654 → "10 h 54 min".

@@ -156,6 +156,11 @@ de veces al día.
 > se devuelve el primero del día siguiente. Las horas ≥ 24 del GTFS se toman módulo 24. Descartamos la
 > búsqueda lineal (O(h)).
 
+> **Jornada de servicio (presentación):** TransMilenio no opera 24 h. La app calcula la jornada de los
+> mismos horarios (en estos datos, de 04:00 a 00:36: las horas 24:xx del GTFS son el final de la jornada) y
+> la usa solo para decir las cosas bien: "Fuera de servicio", "ya no pasa hoy · mañana a las 05:30" en vez
+> de "en 10 h 54 min". R4 no cambia: sigue devolviendo el próximo bus de forma circular, como pide el contrato.
+
 ### R5 · Viaje directo o con un transbordo — dos recorridos con marcas · O(L_o + L_d)
 No hay un algoritmo del curso que lo haga tal cual; combinamos lista enlazada + arreglos con marcas
 (como una hash table de índices):

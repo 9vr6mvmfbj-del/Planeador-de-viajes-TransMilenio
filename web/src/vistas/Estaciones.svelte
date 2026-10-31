@@ -1,6 +1,7 @@
 <script>
   // R1 (estado), R2 (autocompletar), R3 (rango), R4 (próximo bus) y R6 (ranking).
-  import { app, motor, horaActual, minutosEntre, formatoNumero, duracion } from '../lib/estado.svelte.js';
+  import { app, motor, horaActual, formatoNumero, espera, enServicio, horaDeJornada } from '../lib/estado.svelte.js';
+  import Palabras from '../componentes/Palabras.svelte';
   import { colorRuta } from '../lib/colores.js';
   import CampoEstacion from '../componentes/CampoEstacion.svelte';
   import ChipRuta from '../componentes/ChipRuta.svelte';
@@ -53,7 +54,7 @@
 
 <header class="cabeza">
   <p class="etiqueta">Red de estaciones</p>
-  <h1 class="titulo-grande">Estaciones</h1>
+  <h1 class="titulo-grande"><Palabras texto="Estaciones" /></h1>
 </header>
 
 <div class="grilla">
@@ -96,12 +97,17 @@
                 <Segmentado etiqueta="Hora" bind:valor={modoHora} opciones={[{ id: 'ahora', texto: 'Ahora' }, { id: 'elegir', texto: 'Otra hora' }]} />
                 {#if modoHora === 'elegir'}<input class="campo hora-campo num" type="time" bind:value={horaElegida} aria-label="Hora" />{/if}
               </div>
+              {#if !enServicio(hora)}
+                <p class="fuera aparece"><span class="estado estado-cerrada">Fuera de servicio</span>
+                  <span class="mini">TransMilenio opera de {horaDeJornada(app.servicio.inicio)} a {horaDeJornada(app.servicio.fin)}.</span></p>
+              {/if}
               {#if proximo}
+                {@const e = espera(hora, proximo)}
                 <div class="grande">
                   <Icono nombre="bus" tam={26} />
                   <div>
-                    <p class="mini tenue">Próximo {rutaElegida} desde las {hora}</p>
-                    <p class="hora-grande num">{proximo}<span class="en"> · {minutosEntre(hora, proximo) === 0 ? 'ya pasa' : `en ${duracion(minutosEntre(hora, proximo))}`}</span></p>
+                    <p class="mini tenue">{e.tipo === 'manana' ? `Primer ${rutaElegida} de la próxima jornada` : `Próximo ${rutaElegida} desde las ${hora}`}</p>
+                    <p class="hora-grande num">{proximo}<span class="en" class:manana={e.tipo === 'manana'}> · {e.texto}</span></p>
                   </div>
                 </div>
                 <div class="siguientes">
@@ -195,6 +201,8 @@
   .grande .mini { color: var(--tenue); }
   .hora-grande { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
   .en { font-size: 17px; font-weight: 600; color: var(--verde); letter-spacing: 0; }
+  .en.manana { color: var(--naranja); }
+  .fuera { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--tinta-2); }
   .siguientes { display: flex; flex-wrap: wrap; gap: 6px; }
   .siguientes .primero { background: var(--c); color: #fff; }
   .ver-mas { justify-self: start; color: var(--azul); font-weight: 600; min-height: 36px; }

@@ -1,6 +1,6 @@
 <script>
   // R5 (viaje directo o con un transbordo) + R2 (autocompletar) + R4 (próximo bus de cada tramo).
-  import { app, motor, horaActual, sumarMinutos, minutosEntre, vibrar, duracion } from '../lib/estado.svelte.js';
+  import { app, motor, horaActual, sumarMinutos, minutosEntre, vibrar, duracion, espera, enServicio, horaDeJornada } from '../lib/estado.svelte.js';
   import { colorRuta } from '../lib/colores.js';
   import CampoEstacion from '../componentes/CampoEstacion.svelte';
   import ChipRuta from '../componentes/ChipRuta.svelte';
@@ -43,8 +43,8 @@
       const paradas = t.recorrido.slice(desde, desde + t.paradas + 1);
       const bus = motor().proximo_bus(t.sube, t.ruta, horaTramo);
       const llegada = bus ? sumarMinutos(bus, t.paradas * MIN_POR_PARADA) : '';
-      const espera = bus ? minutosEntre(horaTramo, bus) : null;
-      const r = { ...t, paradasLista: paradas, bus, llegada, espera, color: colorRuta(t.ruta) };
+      const esperaMin = bus ? minutosEntre(horaTramo, bus) : null;
+      const r = { ...t, paradasLista: paradas, bus, llegada, espera: esperaMin, horaTramo, color: colorRuta(t.ruta) };
       if (llegada) horaTramo = llegada;
       return r;
     });
@@ -86,6 +86,10 @@
         <span class="tenue pequeno num"><Icono nombre="reloj" tam={16} /> {hora}</span>
       {/if}
     </div>
+    {#if !enServicio(hora)}
+      <p class="fuera aparece"><span class="estado estado-cerrada">Fuera de servicio</span>
+        <span class="mini">TransMilenio opera de {horaDeJornada(app.servicio.inicio)} a {horaDeJornada(app.servicio.fin)}: te mostramos los primeros buses de la próxima jornada.</span></p>
+    {/if}
 
     {#if !origen}
       <div class="populares">
@@ -144,7 +148,7 @@
               <div class="bus">
                 <span class="mini tenue">Próximo bus</span>
                 <span class="hora-bus num"><Numero valor={t.bus} /></span>
-                {#if t.espera !== null}<span class="mini" class:pronto={t.espera <= 5}>{i === 0 ? (t.espera === 0 ? 'ya pasa' : `en ${duracion(t.espera)}`) : (t.espera === 0 ? 'justo al llegar' : `esperas ${duracion(t.espera)}`)}</span>{/if}
+                {#if t.espera !== null}{@const e = espera(t.horaTramo, t.bus)}<span class="mini" class:pronto={e.tipo === 'pronto'} class:manana={e.tipo === 'manana'}>{e.tipo === 'manana' ? e.texto : i === 0 ? e.texto : (e.minutos === 0 ? 'justo al llegar' : `esperas ${duracion(e.minutos)}`)}</span>{/if}
               </div>
             {:else}
               <span class="mini tenue">Sin horarios</span>
@@ -203,6 +207,8 @@
   .bus { display: grid; justify-items: end; line-height: 1.2; }
   .hora-bus { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
   .pronto { color: var(--verde); font-weight: 600; }
+  .manana { color: var(--naranja); font-weight: 600; }
+  .fuera { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; color: var(--tinta-2); }
   .ver-mas { margin: 6px 0 0 34px; color: var(--azul); font-weight: 600; min-height: 36px; }
   .nota-final { padding: 0 6px; }
 

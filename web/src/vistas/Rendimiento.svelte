@@ -4,6 +4,7 @@
   // (C++ compilado, `make rendimiento`); el botón la repite aquí mismo (WebAssembly) en este dispositivo.
   import nativo from '../lib/rendimiento-nativo.json';
   import Icono from '../componentes/Icono.svelte';
+  import Palabras from '../componentes/Palabras.svelte';
 
   let datos = $state(nativo);
   let fuente = $state('nativo');
@@ -60,7 +61,7 @@
 <header class="cabeza">
   <p class="etiqueta">R11 · Panel de rendimiento</p>
   <div class="fila-titulo">
-    <h1 class="titulo-grande">Rendimiento</h1>
+    <h1 class="titulo-grande"><Palabras texto="Rendimiento" /></h1>
     <button class="boton boton-primario" onclick={medir} disabled={midiendo}>
       {#if midiendo}<span class="anillo" aria-hidden="true"></span>Midiendo…{:else}<Icono nombre="rayo" tam={18} />Medir aquí{/if}
     </button>
