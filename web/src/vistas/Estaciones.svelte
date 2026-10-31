@@ -1,6 +1,6 @@
 <script>
   // R1 (estado), R2 (autocompletar), R3 (rango), R4 (próximo bus) y R6 (ranking).
-  import { app, motor, horaActual, minutosEntre, formatoNumero } from '../lib/estado.svelte.js';
+  import { app, motor, horaActual, minutosEntre, formatoNumero, duracion } from '../lib/estado.svelte.js';
   import { colorRuta } from '../lib/colores.js';
   import CampoEstacion from '../componentes/CampoEstacion.svelte';
   import ChipRuta from '../componentes/ChipRuta.svelte';
@@ -101,7 +101,7 @@
                   <Icono nombre="bus" tam={26} />
                   <div>
                     <p class="mini tenue">Próximo {rutaElegida} desde las {hora}</p>
-                    <p class="hora-grande num">{proximo}<span class="en"> · {minutosEntre(hora, proximo) === 0 ? 'ya pasa' : `en ${minutosEntre(hora, proximo)} min`}</span></p>
+                    <p class="hora-grande num">{proximo}<span class="en"> · {minutosEntre(hora, proximo) === 0 ? 'ya pasa' : `en ${duracion(minutosEntre(hora, proximo))}`}</span></p>
                   </div>
                 </div>
                 <div class="siguientes">
@@ -175,8 +175,11 @@
   .estado-texto { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
   .vacio { display: grid; gap: 6px; }
   .rutas {
-    display: flex; gap: 6px; margin: 8px -18px 16px; padding: 5px 18px 8px;
+    display: flex; gap: 6px; margin: 8px -18px 16px; padding: 6px 18px 8px;
     overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none;
+    /* sin esto el "imán" alinea el primer chip con el borde de la tarjeta y se ve cortado a la izquierda */
+    scroll-padding-inline: 18px;
+    overscroll-behavior-x: contain;
   }
   .rutas::-webkit-scrollbar { display: none; }
   .rutas .ruta-boton { flex: none; scroll-snap-align: start; }

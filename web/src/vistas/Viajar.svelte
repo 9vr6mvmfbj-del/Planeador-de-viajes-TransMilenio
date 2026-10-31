@@ -1,6 +1,6 @@
 <script>
   // R5 (viaje directo o con un transbordo) + R2 (autocompletar) + R4 (próximo bus de cada tramo).
-  import { app, motor, horaActual, sumarMinutos, minutosEntre, vibrar } from '../lib/estado.svelte.js';
+  import { app, motor, horaActual, sumarMinutos, minutosEntre, vibrar, duracion } from '../lib/estado.svelte.js';
   import { colorRuta } from '../lib/colores.js';
   import CampoEstacion from '../componentes/CampoEstacion.svelte';
   import ChipRuta from '../componentes/ChipRuta.svelte';
@@ -144,7 +144,7 @@
               <div class="bus">
                 <span class="mini tenue">Próximo bus</span>
                 <span class="hora-bus num"><Numero valor={t.bus} /></span>
-                {#if t.espera !== null}<span class="mini" class:pronto={t.espera <= 5}>{i === 0 ? (t.espera === 0 ? 'ya pasa' : `en ${t.espera} min`) : (t.espera === 0 ? 'justo al llegar' : `esperas ${t.espera} min`)}</span>{/if}
+                {#if t.espera !== null}<span class="mini" class:pronto={t.espera <= 5}>{i === 0 ? (t.espera === 0 ? 'ya pasa' : `en ${duracion(t.espera)}`) : (t.espera === 0 ? 'justo al llegar' : `esperas ${duracion(t.espera)}`)}</span>{/if}
               </div>
             {:else}
               <span class="mini tenue">Sin horarios</span>
