@@ -15,6 +15,8 @@
   import Icono from '../componentes/Icono.svelte';
   import Segmentado from '../componentes/Segmentado.svelte';
   import TecladoPin from '../componentes/TecladoPin.svelte';
+  import Palabras from '../componentes/Palabras.svelte';
+  import Cargando from '../componentes/Cargando.svelte';
   import { buscar, normalizar } from '../lib/busqueda.js';
 
   let seccion = $state('estaciones');
@@ -42,6 +44,7 @@
   }
 
   let desbloqueando = $state(false);
+  let abriendo = $state(false);
   function desbloquear() {
     desbloqueando = true;
     pedido = {
@@ -49,8 +52,10 @@
       detalle: 'Solo para el equipo que opera la red.',
       accion: async (pin) => {
         if (!(await pinCorrecto(pin))) return { ok: false, pin: false };
-        sesion.admin = true;
         vibrar(10);
+        // pausa breve con indicador: da la sensación de entrar a una zona segura (y no a un cambio de pestaña)
+        abriendo = true;
+        setTimeout(() => { sesion.admin = true; abriendo = false; }, 1000);
         return { ok: true };
       },
     };
@@ -208,14 +213,20 @@
 <header class="cabeza">
   <p class="etiqueta">Operación de la red</p>
   <div class="fila-titulo">
-    <h1 class="titulo-grande">Admin</h1>
+    <h1 class="titulo-grande"><Palabras texto="Admin" /></h1>
     {#if sesion.admin}
       <button class="boton bloquear" onclick={() => { sesion.admin = false; vibrar(); }}><Icono nombre="candado" tam={16} />Bloquear</button>
     {/if}
   </div>
 </header>
 
-{#if !sesion.admin}
+{#if abriendo}
+  <section class="vidrio tarjeta bloqueo aparece" aria-live="polite">
+    <Cargando tam={34} />
+    <h2 class="titulo">Verificando acceso…</h2>
+    <p class="pequeno tenue">Abriendo el panel de administración</p>
+  </section>
+{:else if !sesion.admin}
   <section class="vidrio tarjeta bloqueo aparece">
     <span class="sello" aria-hidden="true"><Icono nombre="candado" tam={30} grosor={1.8} /></span>
     <h2 class="titulo">Solo para administradores</h2>
