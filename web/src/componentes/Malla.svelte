@@ -42,4 +42,8 @@
   /* en oscuro el color brilla más sobre negro: se baja un poco para no cansar */
   @media (prefers-color-scheme: dark) { .malla { --v: 0.85; } }
   @media (prefers-reduced-motion: reduce) { .m { animation: none; } .malla { transition: none; } }
+  /* En el celular la malla queda quieta (solo cambia de color con la ruta): si el fondo se mueve, todas
+     las tarjetas de vidrio tienen que volver a desenfocarlo en cada cuadro, y eso trababa el scroll y la
+     barra en el iPhone. En escritorio sí deriva. */
+  @media (pointer: coarse), (max-width: 979px) { .m { animation: none; will-change: auto; } }
 </style>
