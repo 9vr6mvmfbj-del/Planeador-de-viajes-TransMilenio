@@ -3,12 +3,18 @@
   // (los datos de entrada) y muestra lo que devuelve el motor.
   import { motor, formatoNumero, sumarMinutos, vibrar } from '../lib/estado.svelte.js';
   import Icono from '../componentes/Icono.svelte';
+  import Segmentado from '../componentes/Segmentado.svelte';
+  import Numero from '../componentes/Numero.svelte';
+  import Palabras from '../componentes/Palabras.svelte';
+  import Particulas from '../componentes/Particulas.svelte';
 
   let pasajeros = $state(24000);
   let duracion = $state(120);   // minutos de hora pico
   let frecuencia = $state(1);   // un bus cada cuántos minutos
   let capacidad = $state(250);  // articulado 160 · biarticulado 250
   let perfil = $state('pico');
+  let tipoBus = $state(250);
+  $effect(() => { capacidad = tipoBus; });
   const INICIO = '05:00';
 
   // Minuto de llegada de cada pasajero, ya en orden (cuantiles de la distribución elegida).
@@ -54,37 +60,30 @@
 
 <header class="cabeza">
   <p class="etiqueta">Simulación de hora pico</p>
-  <h1 class="titulo-grande">Fila de abordaje</h1>
+  <h1 class="titulo-grande"><Palabras texto="Fila de abordaje" /></h1>
 </header>
 
 <div class="grilla">
   <section class="vidrio tarjeta controles">
     <label class="control-rango">
-      <span class="fila"><span>Pasajeros</span><strong class="num">{formatoNumero(pasajeros)}</strong></span>
+      <span class="fila"><span>Pasajeros</span><strong class="num"><Numero valor={formatoNumero(pasajeros)} /></strong></span>
       <input type="range" min="2000" max="800000" step="2000" bind:value={pasajeros} />
     </label>
     <label class="control-rango">
-      <span class="fila"><span>Duración de la hora pico</span><strong class="num">{duracion} min</strong></span>
+      <span class="fila"><span>Duración de la hora pico</span><strong class="num"><Numero valor={duracion} /> min</strong></span>
       <input type="range" min="30" max="360" step="15" bind:value={duracion} />
     </label>
     <label class="control-rango">
-      <span class="fila"><span>Un bus cada</span><strong class="num">{frecuencia} min</strong></span>
+      <span class="fila"><span>Un bus cada</span><strong class="num"><Numero valor={frecuencia} /> min</strong></span>
       <input type="range" min="1" max="15" step="1" bind:value={frecuencia} />
     </label>
     <div class="control-rango">
       <span class="fila"><span>Bus</span><strong class="num">{capacidad} cupos</strong></span>
-      <div class="segmentado" role="group" aria-label="Tipo de bus">
-        <button aria-pressed={capacidad === 160} onclick={() => (capacidad = 160)}>Articulado</button>
-        <button aria-pressed={capacidad === 250} onclick={() => (capacidad = 250)}>Biarticulado</button>
-      </div>
+      <Segmentado etiqueta="Tipo de bus" bind:valor={tipoBus} opciones={[{ id: 160, texto: 'Articulado' }, { id: 250, texto: 'Biarticulado' }]} />
     </div>
     <div class="control-rango">
       <span class="fila"><span>Cómo llega la gente</span></span>
-      <div class="segmentado" role="group" aria-label="Perfil de llegadas">
-        <button aria-pressed={perfil === 'constante'} onclick={() => (perfil = 'constante')}>Parejo</button>
-        <button aria-pressed={perfil === 'pico'} onclick={() => (perfil = 'pico')}>Un pico</button>
-        <button aria-pressed={perfil === 'dos'} onclick={() => (perfil = 'dos')}>Dos picos</button>
-      </div>
+      <Segmentado etiqueta="Perfil de llegadas" bind:valor={perfil} opciones={[{ id: 'constante', texto: 'Parejo' }, { id: 'pico', texto: 'Un pico' }, { id: 'dos', texto: 'Dos picos' }]} />
     </div>
   </section>
 
@@ -96,10 +95,10 @@
           <span class="chip num"><Icono nombre="rayo" tam={14} /> {formatoNumero(resultado.pasajeros)} en {ms.toFixed(1)} ms</span>
         </div>
         <div class="metricas">
-          <div class="metrica" class:alerta={saturado}><p class="valor num">{resultado.esperaPromedio.toFixed(1)}</p><p class="mini tenue">min de espera promedio</p></div>
-          <div class="metrica"><p class="valor num">{resultado.esperaMaxima}</p><p class="mini tenue">min de espera máxima</p></div>
-          <div class="metrica"><p class="valor num">{formatoNumero(resultado.buses)}</p><p class="mini tenue">buses despachados</p></div>
-          <div class="metrica"><p class="valor num">{Math.round((resultado.busesLlenos / Math.max(1, resultado.buses)) * 100)}%</p><p class="mini tenue">buses salen llenos</p></div>
+          <div class="metrica" class:alerta={saturado}><p class="valor num"><Numero valor={resultado.esperaPromedio.toFixed(1)} /></p><p class="mini tenue">min de espera promedio</p></div>
+          <div class="metrica"><p class="valor num"><Numero valor={resultado.esperaMaxima} /></p><p class="mini tenue">min de espera máxima</p></div>
+          <div class="metrica"><p class="valor num"><Numero valor={formatoNumero(resultado.buses)} /></p><p class="mini tenue">buses despachados</p></div>
+          <div class="metrica"><p class="valor num"><Numero valor={Math.round((resultado.busesLlenos / Math.max(1, resultado.buses)) * 100)} />%</p><p class="mini tenue">buses salen llenos</p></div>
         </div>
         <p class="pequeno tenue resumen">
           {#if saturado}La fila crece más rápido de lo que los buses la vacían: el último pasajero sale a las <strong class="num">{sumarMinutos(INICIO, resultado.ultimaSalida)}</strong>, aunque la llegada termina a las {sumarMinutos(INICIO, duracion)}.
@@ -107,6 +106,10 @@
         </p>
       </section>
     {/if}
+
+    <section class="vidrio tarjeta">
+      <Particulas {llegadas} {duracion} {frecuencia} {capacidad} {pasajeros} />
+    </section>
 
     <section class="vidrio tarjeta">
       <p class="etiqueta">Llegadas cada 5 minutos</p>

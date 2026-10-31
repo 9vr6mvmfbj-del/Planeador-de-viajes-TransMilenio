@@ -6,6 +6,10 @@
   import ChipRuta from '../componentes/ChipRuta.svelte';
   import LineaRuta from '../componentes/LineaRuta.svelte';
   import Icono from '../componentes/Icono.svelte';
+  import Segmentado from '../componentes/Segmentado.svelte';
+  import Numero from '../componentes/Numero.svelte';
+  import Palabras from '../componentes/Palabras.svelte';
+  import { acento } from '../lib/acento.svelte.js';
 
   const MIN_POR_PARADA = 3; // estimado solo para mostrar la hora de llegada
 
@@ -45,6 +49,7 @@
       return r;
     });
   });
+  $effect(() => { acento.color = tramos.length ? tramos[0].color : '#e3001b'; });
   let llegadaFinal = $derived(tramos.length ? tramos[tramos.length - 1].llegada : '');
 
   function intercambiar() {
@@ -57,7 +62,7 @@
 
 <header class="cabeza">
   <p class="etiqueta">Planear viaje</p>
-  <h1 class="titulo-grande">¿A dónde vas?</h1>
+  <h1 class="titulo-grande"><Palabras texto="¿A dónde vas?" /></h1>
 </header>
 
 <div class="grilla">
@@ -74,10 +79,7 @@
     </div>
 
     <div class="hora">
-      <div class="segmentado" role="group" aria-label="Hora de salida">
-        <button aria-pressed={modoHora === 'ahora'} onclick={() => (modoHora = 'ahora')}>Salir ahora</button>
-        <button aria-pressed={modoHora === 'elegir'} onclick={() => (modoHora = 'elegir')}>Elegir hora</button>
-      </div>
+      <Segmentado etiqueta="Hora de salida" bind:valor={modoHora} opciones={[{ id: 'ahora', texto: 'Salir ahora' }, { id: 'elegir', texto: 'Elegir hora' }]} />
       {#if modoHora === 'elegir'}
         <input class="campo hora-campo num" type="time" bind:value={horaElegida} aria-label="Hora de salida" />
       {:else}
@@ -119,9 +121,9 @@
     {:else}
       <article class="vidrio tarjeta resumen aparece">
         <div class="metricas">
-          <div><p class="valor num">{viaje.paradas}</p><p class="mini tenue">paradas</p></div>
-          <div><p class="valor num">{viaje.tramos.length - 1}</p><p class="mini tenue">{viaje.tramos.length === 2 ? 'transbordo' : 'transbordos'}</p></div>
-          <div><p class="valor num">{llegadaFinal || '—'}</p><p class="mini tenue">llegada aprox.</p></div>
+          <div><p class="valor num"><Numero valor={viaje.paradas} /></p><p class="mini tenue">paradas</p></div>
+          <div><p class="valor num"><Numero valor={viaje.tramos.length - 1} /></p><p class="mini tenue">{viaje.tramos.length === 2 ? 'transbordo' : 'transbordos'}</p></div>
+          <div><p class="valor num"><Numero valor={llegadaFinal || '—'} /></p><p class="mini tenue">llegada aprox.</p></div>
         </div>
         <div class="rutas-chips">
           {#each viaje.tramos as t, i}
@@ -141,7 +143,7 @@
             {#if t.bus}
               <div class="bus">
                 <span class="mini tenue">Próximo bus</span>
-                <span class="hora-bus num">{t.bus}</span>
+                <span class="hora-bus num"><Numero valor={t.bus} /></span>
                 {#if t.espera !== null}<span class="mini" class:pronto={t.espera <= 5}>{i === 0 ? (t.espera === 0 ? 'ya pasa' : `en ${t.espera} min`) : (t.espera === 0 ? 'justo al llegar' : `esperas ${t.espera} min`)}</span>{/if}
               </div>
             {:else}
