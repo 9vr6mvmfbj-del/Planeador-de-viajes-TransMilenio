@@ -461,7 +461,7 @@ std::string Red::proximo_bus(const std::string& estacion, const std::string& rut
     if (!i || horarios_[*i].empty()) return "";
     const std::vector<int>& v = horarios_[*i];
     int pos = primeraPosicionNoMenor(v, m);
-    if (pos == static_cast<int>(v.size())) pos = 0;  // ya no hay más hoy: el primero del día siguiente
+    if (pos == static_cast<int>(v.size())) return "";  // ya no hay más buses ese día: None
     return aHora(v[pos]);
 }
 

@@ -65,6 +65,7 @@ public:
     std::string estado(const std::string& nombre) const;
     std::vector<std::string> autocompletar(const std::string& prefijo, int k) const;
     std::vector<std::string> rango(const std::string& desde, const std::string& hasta) const;
+    // Devuelve "HH:MM" del siguiente bus (o el de esa misma hora), o "" (= None) si ya no hay más ese día.
     std::string proximo_bus(const std::string& estacion, const std::string& ruta,
                             const std::string& hora) const;
     Viaje viaje(const std::string& origen, const std::string& destino) const;

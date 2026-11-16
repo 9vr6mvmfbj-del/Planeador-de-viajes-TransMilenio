@@ -1,6 +1,6 @@
 <script>
   // R5 (viaje directo o con un transbordo) + R2 (autocompletar) + R4 (próximo bus de cada tramo).
-  import { app, motor, horaActual, sumarMinutos, minutosEntre, vibrar, duracion, espera, enServicio, horaDeJornada } from '../lib/estado.svelte.js';
+  import { app, motor, proximoBus, horaActual, sumarMinutos, minutosEntre, vibrar, duracion, espera, enServicio, horaDeJornada } from '../lib/estado.svelte.js';
   import { colorRuta } from '../lib/colores.js';
   import CampoEstacion from '../componentes/CampoEstacion.svelte';
   import ChipRuta from '../componentes/ChipRuta.svelte';
@@ -41,7 +41,7 @@
     return viaje.tramos.map((t) => {
       const desde = t.recorrido.indexOf(t.sube);
       const paradas = t.recorrido.slice(desde, desde + t.paradas + 1);
-      const bus = motor().proximo_bus(t.sube, t.ruta, horaTramo);
+      const bus = proximoBus(t.sube, t.ruta, horaTramo);
       const llegada = bus ? sumarMinutos(bus, t.paradas * MIN_POR_PARADA) : '';
       const esperaMin = bus ? minutosEntre(horaTramo, bus) : null;
       const r = { ...t, paradasLista: paradas, bus, llegada, espera: esperaMin, horaTramo, color: colorRuta(t.ruta) };

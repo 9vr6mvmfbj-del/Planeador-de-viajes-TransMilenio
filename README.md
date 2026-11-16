@@ -100,7 +100,7 @@ Estructuras propias en `motor/estructuras/`: `TablaHash` (encadenamiento, factor
 |---|---|
 | `estado(nombre)` | `"ABIERTA"`, `"CERRADA"` o `"NO EXISTE"` |
 | `autocompletar(prefijo, k)`, `rango(desde, hasta)`, `ranking(k)`, `recorrido(...)` | lista de nombres |
-| `proximo_bus(estacion, ruta, hora)` | `"HH:MM"`, o `""` si no hay |
+| `proximo_bus(estacion, ruta, hora)` | `"HH:MM"`, o `""` (None) si no hay más ese día |
 | `viaje(origen, destino)` | `Viaje{encontrado, paradas, tramos[{ruta, sube, baja, paradas}]}` |
 | `agregar_parada`, `quitar_parada`, `cerrar`, `reabrir`, `deshacer`, `rehacer` | `true` si hubo cambio |
 | `simular_fila(llegadas, frecuencia, capacidad)` | `{pasajeros, buses, espera_promedio, espera_maxima, ultima_salida, buses_llenos}` |
@@ -145,21 +145,22 @@ Igual que R2, pero se detiene cuando el nombre pasa `hasta`. Es inclusivo en los
 
 ### R4 · Próximo bus — Tabla hash + búsqueda binaria · O(1) + O(log h)
 `(ruta, estación) → arreglo de horas ordenado` (se ordena una sola vez al cargar, con merge sort).
-La búsqueda binaria encuentra la primera hora ≥ la pedida. Si ya no hay más ese día, se devuelve el
-primer bus del día siguiente (circular). **Horas del GTFS ≥ 24** (ej. 25:10): la conversión las deja
-módulo 24 (01:10) y el motor también; con la búsqueda circular, a las 23:50 el próximo bus es el de las
-00:04, que es lo correcto. **Descartado:** recorrer las h horas (O(h)) — las troncales pasan cientos
+La búsqueda binaria encuentra la primera hora ≥ la pedida. Si ya no hay más ese día, devuelve **None**
+(`""` en C++, `null` en la app), como pide el contrato: no da la vuelta a la medianoche. **Horas del
+GTFS ≥ 24** (ej. 25:10): la conversión las deja módulo 24 (01:10) y el motor también, así que 25:10 cuenta
+como un bus de la madrugada (01:10) del mismo día y a las 23:55 ya no hay más. **Descartado:** recorrer las h horas (O(h)) — las troncales pasan cientos
 de veces al día.
 
 > **README:** R4 usa una tabla hash (ruta, estación) → arreglo de horas ordenado y búsqueda binaria del
 > límite inferior: O(1) + O(log h), h = horarios de esa ruta en esa estación. Si no hay más buses ese día
-> se devuelve el primero del día siguiente. Las horas ≥ 24 del GTFS se toman módulo 24. Descartamos la
-> búsqueda lineal (O(h)).
+> devuelve None. Las horas ≥ 24 del GTFS se toman módulo 24 (25:10 → 01:10). Descartamos la búsqueda
+> lineal (O(h)).
 
 > **Jornada de servicio (presentación):** TransMilenio no opera 24 h. La app calcula la jornada de los
 > mismos horarios (en estos datos, de 04:00 a 00:36: las horas 24:xx del GTFS son el final de la jornada) y
 > la usa solo para decir las cosas bien: "Fuera de servicio", "ya no pasa hoy · mañana a las 05:30" en vez
-> de "en 10 h 54 min". R4 no cambia: sigue devolviendo el próximo bus de forma circular, como pide el contrato.
+> de "en 10 h 54 min". R4 no cambia: devuelve None cuando ya no hay más buses ese día; para mostrar "mañana a las 05:30" la app
+> vuelve a preguntarle al motor desde las 00:00.
 
 ### R5 · Viaje directo o con un transbordo — dos recorridos con marcas · O(L_o + L_d)
 No hay un algoritmo del curso que lo haga tal cual; combinamos lista enlazada + arreglos con marcas

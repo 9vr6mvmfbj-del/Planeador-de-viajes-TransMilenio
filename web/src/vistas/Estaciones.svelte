@@ -1,6 +1,6 @@
 <script>
   // R1 (estado), R2 (autocompletar), R3 (rango), R4 (próximo bus) y R6 (ranking).
-  import { app, motor, horaActual, formatoNumero, espera, enServicio, horaDeJornada } from '../lib/estado.svelte.js';
+  import { app, motor, proximoBus, horaActual, formatoNumero, espera, enServicio, horaDeJornada } from '../lib/estado.svelte.js';
   import Palabras from '../componentes/Palabras.svelte';
   import { colorRuta } from '../lib/colores.js';
   import CampoEstacion from '../componentes/CampoEstacion.svelte';
@@ -29,7 +29,7 @@
   });
 
   let horarios = $derived.by(() => { app.version; return elegida && rutaElegida ? motor().horarios(elegida, rutaElegida) : []; });
-  let proximo = $derived.by(() => { app.version; return elegida && rutaElegida ? motor().proximo_bus(elegida, rutaElegida, hora) : ''; });
+  let proximo = $derived.by(() => { app.version; return elegida && rutaElegida ? proximoBus(elegida, rutaElegida, hora) : ''; });
   let siguientes = $derived.by(() => {
     if (!proximo) return [];
     const i = horarios.indexOf(proximo);

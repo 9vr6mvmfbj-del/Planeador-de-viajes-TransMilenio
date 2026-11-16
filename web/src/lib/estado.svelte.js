@@ -228,8 +228,8 @@ export function minutosEntre(desde, hasta) {
 
 // ================================================================= jornada de servicio
 // TransMilenio no opera 24 horas: abre hacia las 04:00 y los últimos buses pasan poco después de la
-// medianoche (las horas 24:xx del GTFS). El motor (R4) responde "el próximo bus" de forma circular, como
-// pide el enunciado; la app usa la jornada para decir "fuera de servicio" o "mañana" en vez de
+// medianoche (las horas 24:xx del GTFS). El motor (R4) responde None cuando ya no hay más buses ese día
+// (como pide el enunciado) y la app, para el viajero, vuelve a preguntar desde las 00:00 (proximoBus); la app usa la jornada para decir "fuera de servicio" o "mañana" en vez de
 // "en 10 h 54 min". La jornada sale de los mismos horarios, no de un número fijo.
 const CORTE = 3 * 60; // las 00:00–02:59 cuentan como el final de la jornada anterior
 const aJornada = (m) => (m < CORTE ? m + 1440 : m);
@@ -249,6 +249,13 @@ function jornada(textoHorarios) {
     if (m > fin) fin = m;
   }
   return isFinite(inicio) ? { inicio, fin } : { inicio: 4 * 60, fin: 24 * 60 };
+}
+
+// R4 devuelve null cuando ya no hay más buses ese día (el contrato no da la vuelta a la medianoche).
+// Para mostrarle algo útil al viajero preguntamos de nuevo desde las 00:00: el primer bus del día siguiente.
+export function proximoBus(estacion, ruta, hora) {
+  const m = motor();
+  return m.proximo_bus(estacion, ruta, hora) ?? m.proximo_bus(estacion, ruta, '00:00');
 }
 
 export function enServicio(hhmm) {

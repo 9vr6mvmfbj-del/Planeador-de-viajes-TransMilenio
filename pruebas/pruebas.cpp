@@ -66,7 +66,11 @@ static void pruebasBasicas() {
     CHECK(red.proximo_bus("A", "R1", "05:00") == "05:30");
     CHECK(red.proximo_bus("A", "R1", "05:30") == "05:30");  // justo a la hora: alcanza
     CHECK(red.proximo_bus("A", "R1", "05:31") == "06:00");
-    CHECK(red.proximo_bus("A", "R1", "23:55") == "05:30");  // ya no hay: el primero del día
+    CHECK(red.proximo_bus("A", "R1", "23:50") == "23:50");  // el último bus del día: justo a la hora
+    CHECK(red.proximo_bus("A", "R1", "23:51") == "");       // ya no hay más ese día: None (no da la vuelta)
+    CHECK(red.proximo_bus("A", "R1", "00:00") == "05:30");  // el primero del día
+    CHECK(red.proximo_bus("A", "R1", "7:05") == "23:50");   // hora sin cero a la izquierda
+    CHECK(red.proximo_bus("c", "r2", "07:00") == "07:00");  // nombres en minúscula
     CHECK(red.proximo_bus("C", "R2", "00:30") == "01:10");
     CHECK(red.proximo_bus("C", "R2", "02:00") == "07:00");
     CHECK(red.proximo_bus("E", "R1", "06:00") == "");       // no hay horarios
@@ -250,7 +254,7 @@ static void pruebasAdmin() {
         CHECK(red.recorrido("NUEVA", true) == V({"X", "D", "A"}));
         CHECK(red.horarios("D", "NUEVA") == V({"06:05", "06:15", "06:25"}));
         CHECK(red.proximo_bus("D", "NUEVA", "06:06") == "06:15");
-        CHECK(red.proximo_bus("X", "NUEVA", "07:00") == "06:10");  // ya no hay hoy: el primero
+        CHECK(red.proximo_bus("X", "NUEVA", "07:00") == "");       // ya no hay más ese día
         CHECK(red.buses_dia("A") == 6);
         Viaje v = red.viaje("A", "X");
         CHECK(v.encontrado && v.paradas == 2 && v.tramos.size() == 1 && v.tramos[0].ruta == "NUEVA");

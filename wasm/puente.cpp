@@ -56,7 +56,11 @@ EXPORTAR const char* m_resumen() { return devolver(resumen()); }
 EXPORTAR const char* m_estado(const char* n) { return devolver(esc(red->estado(n))); }
 EXPORTAR const char* m_autocompletar(const char* p, int k) { return devolver(lista(red->autocompletar(p, k))); }
 EXPORTAR const char* m_rango(const char* d, const char* h) { return devolver(lista(red->rango(d, h))); }
-EXPORTAR const char* m_proximo_bus(const char* e, const char* r, const char* h) { return devolver(esc(red->proximo_bus(e, r, h))); }
+// R4: "" del motor (no hay más buses ese día) llega a JavaScript como null, el None del contrato.
+EXPORTAR const char* m_proximo_bus(const char* e, const char* r, const char* h) {
+    std::string b = red->proximo_bus(e, r, h);
+    return devolver(b.empty() ? std::string("null") : esc(b));
+}
 
 EXPORTAR const char* m_viaje(const char* o, const char* d) {
     Viaje v = red->viaje(o, d);
