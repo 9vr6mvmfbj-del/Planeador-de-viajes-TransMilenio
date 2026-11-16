@@ -76,11 +76,11 @@ EXPORTAR const char* m_viaje(const char* o, const char* d) {
 }
 
 EXPORTAR const char* m_ranking(int k) {
-    std::vector<std::string> v = red->ranking(k);
+    std::vector<std::pair<std::string, int>> v = red->ranking(k);
     std::string s = "[";
     for (size_t i = 0; i < v.size(); i++) {
         if (i) s += ",";
-        s += "{\"nombre\":" + esc(v[i]) + ",\"buses\":" + std::to_string(red->buses_dia(v[i])) + "}";
+        s += "{\"nombre\":" + esc(v[i].first) + ",\"buses\":" + std::to_string(v[i].second) + "}";
     }
     return devolver(s + "]");
 }

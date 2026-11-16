@@ -99,7 +99,8 @@ Estructuras propias en `motor/estructuras/`: `TablaHash` (encadenamiento, factor
 | Llamada | Devuelve |
 |---|---|
 | `estado(nombre)` | `"ABIERTA"`, `"CERRADA"` o `"NO EXISTE"` |
-| `autocompletar(prefijo, k)`, `rango(desde, hasta)`, `ranking(k)`, `recorrido(...)` | lista de nombres |
+| `autocompletar(prefijo, k)`, `rango(desde, hasta)`, `recorrido(...)` | lista de nombres |
+| `ranking(k)` | lista de `(nombre, buses_por_dia)`, de mayor a menor |
 | `proximo_bus(estacion, ruta, hora)` | `"HH:MM"`, o `""` (None) si no hay más ese día |
 | `viaje(origen, destino)` | `Viaje{encontrado, paradas, tramos[{ruta, sube, baja, paradas}]}` |
 | `agregar_parada`, `quitar_parada`, `cerrar`, `reabrir`, `deshacer`, `rehacer` | `true` si hubo cambio |

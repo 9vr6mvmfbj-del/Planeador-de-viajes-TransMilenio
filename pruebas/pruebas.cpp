@@ -23,6 +23,12 @@ static int fallas = 0, total = 0;
     } while (0)
 
 static vector<string> V(std::initializer_list<string> l) { return vector<string>(l); }
+// Solo los nombres de un ranking (nombre, buses_por_dia).
+static vector<string> nombresDe(const vector<std::pair<string, int>>& r) {
+    vector<string> v;
+    for (auto& p : r) v.push_back(p.first);
+    return v;
+}
 
 static void escribir(const string& ruta, const string& texto) {
     std::ofstream f(ruta, std::ios::binary);
@@ -87,8 +93,12 @@ static void pruebasBasicas() {
     v = red.viaje("A", "A");
     CHECK(v.encontrado && v.paradas == 0);
     // R6 (A: 3 buses; C: 3 (R1 06:10 + R2 07:00 y 01:10); E: 1; D: 2; B: 1; X: 1)
-    CHECK(red.ranking(2) == V({"A", "C"}));
+    CHECK(nombresDe(red.ranking(2)) == V({"A", "C"}));
     CHECK(red.ranking(0).empty());
+    CHECK(red.ranking(-3).empty());
+    CHECK(red.ranking(1) == (vector<std::pair<string, int>>{{"A", 3}}));  // (nombre, buses_por_dia)
+    CHECK(red.ranking(3) == (vector<std::pair<string, int>>{{"A", 3}, {"C", 3}, {"D", 2}}));  // empate: alfabético
+    CHECK(red.ranking(100).size() == 11);  // k mayor que n: salen todas las abiertas (las de 0 buses al final)
     CHECK(red.buses_dia("D") == 2);
     // R7
     CHECK(red.recorrido("R2") == V({"X", "C", "Y", "E"}));
@@ -107,7 +117,7 @@ static void pruebasOperacion() {
     CHECK(red.estado("C") == "CERRADA");
     CHECK(red.autocompletar("C", 5) == V({"CALLE 26", "CALLE 30", "CALLE 80"}));
     CHECK(red.rango("B", "CZ") == V({"B", "CALLE 26", "CALLE 30", "CALLE 80"}));
-    CHECK(red.ranking(1) == V({"A"}));
+    CHECK(nombresDe(red.ranking(1)) == V({"A"}));
     CHECK(red.proximo_bus("C", "R1", "06:00") == "");  // nadie sube en una cerrada
     Viaje v = red.viaje("X", "D");                       // ya no se puede transbordar en C
     CHECK(v.encontrado && v.paradas == 4 && v.transbordo() == "E");
@@ -206,7 +216,7 @@ static void pruebasAdmin() {
         CHECK(red.num_estaciones() == est - 1);
         CHECK(red.recorrido("R1") == V({"A", "B", "D", "E"}));
         CHECK(red.recorrido("R2") == V({"X", "Y", "E"}));
-        CHECK(red.ranking(2) == V({"A", "D"}));
+        CHECK(nombresDe(red.ranking(2)) == V({"A", "D"}));
         Viaje v = red.viaje("X", "D");  // ya no hay transbordo en C: X -R2-> E -R3-> D
         CHECK(v.encontrado && v.paradas == 3 && v.transbordo() == "E");
         CHECK(red.proximo_bus("C", "R2", "06:00") == "");
@@ -216,7 +226,7 @@ static void pruebasAdmin() {
         CHECK(red.recorrido("R1") == V({"A", "B", "C", "D", "E"}));
         CHECK(red.recorrido("R2") == V({"X", "C", "Y", "E"}));
         CHECK(red.buses_dia("C") == 3);
-        CHECK(red.ranking(2) == V({"A", "C"}));
+        CHECK(nombresDe(red.ranking(2)) == V({"A", "C"}));
         CHECK(red.viaje("X", "D").paradas == 2);
         CHECK(red.proximo_bus("C", "R2", "06:00") == "07:00");
         CHECK(red.rehacer());
@@ -228,9 +238,9 @@ static void pruebasAdmin() {
         CHECK(red.deshacer());
         CHECK(red.estado("C") == "CERRADA");
         CHECK(red.recorrido("R2") == V({"X", "C", "Y", "E"}));
-        CHECK(red.ranking(2) == V({"A", "D"}));  // cerrada: sigue fuera del ranking
+        CHECK(nombresDe(red.ranking(2)) == V({"A", "D"}));  // cerrada: sigue fuera del ranking
         CHECK(red.deshacer());                   // cerrar C
-        CHECK(red.ranking(2) == V({"A", "C"}));
+        CHECK(nombresDe(red.ranking(2)) == V({"A", "C"}));
         CHECK(red.eliminar_estacion("A"));       // la primera de R1
         CHECK(red.recorrido("R1") == V({"B", "C", "D", "E"}));
         CHECK(red.deshacer());
@@ -359,7 +369,7 @@ static void pruebasAdmin() {
             string s;
             for (const string& r : red.nombres_rutas()) { s += r + ":"; for (const string& e : red.recorrido(r)) s += e + ","; s += ";"; }
             for (const string& e : est) s += e + "=" + red.estado(e) + std::to_string(red.buses_dia(e)) + ";";
-            for (const string& r : red.ranking(20)) s += r + ",";
+            for (const string& r : nombresDe(red.ranking(20))) s += r + ",";
             s += std::to_string(red.num_rutas()) + "/" + std::to_string(red.num_horarios()) + "/" + std::to_string(red.num_estaciones());
             return s;
         };

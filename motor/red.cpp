@@ -549,11 +549,11 @@ Viaje Red::viaje(const std::string& origen, const std::string& destino) const {
 }
 
 // ----------------------------------------------------------------- R6
-std::vector<std::string> Red::ranking(int k) const {
-    std::vector<std::string> res;
+std::vector<std::pair<std::string, int>> Red::ranking(int k) const {
+    std::vector<std::pair<std::string, int>> res;
     if (k <= 0) return res;
     arbolRanking_.recorrerTodo([&](const ClaveRanking& c) {
-        res.push_back(c.nombre);
+        res.push_back(std::make_pair(c.nombre, c.buses));
         return static_cast<int>(res.size()) < k;
     });
     return res;

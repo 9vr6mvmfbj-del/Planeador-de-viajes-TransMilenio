@@ -23,6 +23,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "estructuras/avl.h"
@@ -69,7 +70,8 @@ public:
     std::string proximo_bus(const std::string& estacion, const std::string& ruta,
                             const std::string& hora) const;
     Viaje viaje(const std::string& origen, const std::string& destino) const;
-    std::vector<std::string> ranking(int k) const;
+    // Las k estaciones abiertas con más buses por día: (nombre, buses_por_dia), de mayor a menor.
+    std::vector<std::pair<std::string, int>> ranking(int k) const;
     bool agregar_parada(const std::string& ruta, const std::string& nueva,
                         const std::string& despues_de);
     bool quitar_parada(const std::string& ruta, const std::string& estacion);
