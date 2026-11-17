@@ -52,11 +52,41 @@
   $effect(() => { acento.color = tramos.length ? tramos[0].color : '#e3001b'; });
   let llegadaFinal = $derived(tramos.length ? tramos[tramos.length - 1].llegada : '');
 
-  function intercambiar() {
-    vibrar();
-    girado = !girado;
+  // Intercambiar: los dos textos se cruzan (uno baja y el otro sube) y al llegar se cambian los valores.
+  let entradas = $state(/** @type {HTMLElement | undefined} */ (undefined));
+  let cruzando = false;
+  const reducido = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function cambiarValores() {
     [textoOrigen, textoDestino] = [textoDestino, textoOrigen];
     [origen, destino] = [destino, origen];
+  }
+  function intercambiar() {
+    if (cruzando) return;
+    vibrar();
+    girado = !girado;
+    const cajas = entradas ? [...entradas.querySelectorAll('.caja')] : [];
+    if (reducido || cajas.length < 2 || !cajas[0].animate || (!textoOrigen && !textoDestino)) { cambiarValores(); return; }
+    cruzando = true;
+    const d = cajas[1].getBoundingClientRect().top - cajas[0].getBoundingClientRect().top;
+    const op = { duration: 360, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' };
+    const cuadros = (dy) => [
+      { transform: 'translateY(0) scale(1)', opacity: 1 },
+      { transform: `translateY(${dy / 2}px) scale(0.96)`, opacity: 0.75, offset: 0.5 },
+      { transform: `translateY(${dy}px) scale(1)`, opacity: 1 },
+    ];
+    cajas[0].style.zIndex = '2';
+    const a = cajas[0].animate(cuadros(d), op);
+    cajas[1].animate(cuadros(-d), op);
+    a.onfinish = a.oncancel = () => { cajas[0].style.zIndex = ''; cambiarValores(); cruzando = false; };
+  }
+
+  // Al pasar a "Elegir hora" el campo de la hora se ilumina 2 s para que se vea dónde se cambia.
+  let destello = $state(false);
+  let relojDestello = 0;
+  function alCambiarModo(id) {
+    clearTimeout(relojDestello);
+    destello = id === 'elegir';
+    if (destello) relojDestello = setTimeout(() => (destello = false), 2000);
   }
 </script>
 
@@ -69,7 +99,7 @@
   <section class="buscador vidrio tarjeta">
     <div class="campos">
       <div class="guia" aria-hidden="true"><span class="o"></span><span class="raya"></span><span class="d"></span></div>
-      <div class="entradas">
+      <div class="entradas" bind:this={entradas}>
         <CampoEstacion etiqueta="Desde" placeholder="Estación de origen" bind:valor={textoOrigen} onelegir={(n) => (origen = n)} />
         <CampoEstacion etiqueta="Hasta" placeholder="Estación de destino" bind:valor={textoDestino} onelegir={(n) => (destino = n)} />
       </div>
@@ -79,9 +109,9 @@
     </div>
 
     <div class="hora">
-      <Segmentado etiqueta="Hora de salida" bind:valor={modoHora} opciones={[{ id: 'ahora', texto: 'Salir ahora' }, { id: 'elegir', texto: 'Elegir hora' }]} />
+      <Segmentado etiqueta="Hora de salida" bind:valor={modoHora} onelegir={alCambiarModo} opciones={[{ id: 'ahora', texto: 'Salir ahora' }, { id: 'elegir', texto: 'Elegir hora' }]} />
       {#if modoHora === 'elegir'}
-        <input class="campo hora-campo num" type="time" bind:value={horaElegida} aria-label="Hora de salida" />
+        <input class="campo hora-campo num" class:destello type="time" bind:value={horaElegida} aria-label="Hora de salida" />
       {:else}
         <span class="tenue pequeno num"><Icono nombre="reloj" tam={16} /> {hora}</span>
       {/if}
@@ -191,6 +221,12 @@
   .hora { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
   .hora span { display: inline-flex; align-items: center; gap: 6px; }
   .hora-campo { width: auto; min-height: 38px; }
+  .hora-campo.destello { animation: destello 2s ease-out both; }
+  @keyframes destello {
+    0%, 55% { background: color-mix(in srgb, var(--rojo) 26%, var(--vidrio-fuerte)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rojo) 70%, transparent), 0 0 26px color-mix(in srgb, var(--rojo) 55%, transparent); }
+    100% { box-shadow: 0 0 0 0 transparent, 0 0 0 transparent; }
+  }
+  @media (prefers-reduced-motion: reduce) { .hora-campo.destello { animation-duration: 2s; animation-timing-function: step-end; } }
   .populares { margin-top: 18px; display: grid; gap: 10px; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .chips .chip { transition: transform 160ms var(--salida); }
