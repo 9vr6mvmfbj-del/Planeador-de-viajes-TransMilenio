@@ -123,7 +123,8 @@ export async function cargarMotor(origen) {
     horarios: (estacion, ruta) => llamar(m.m_horarios, estacion, ruta),
     rutas: () => leer(m.m_rutas()),
     cerradas: () => leer(m.m_cerradas()),
-    rendimiento: (maxEscala = 8, consultas = 20000) => leer(m.m_rendimiento(maxEscala, consultas)),
+    // R11: mide cada operación sobre la red cargada (mediana de 'reps' repeticiones).
+    medir_red: (consultas = 20000, reps = 5) => leer(m.m_medir_red(consultas, reps)),
 
     // ---- panel de admin (también entran a deshacer/rehacer) ----
     crear_estacion: (nombre) => llamar(m.m_crear_estacion, nombre),
