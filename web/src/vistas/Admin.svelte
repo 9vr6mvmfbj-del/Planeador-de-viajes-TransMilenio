@@ -232,6 +232,7 @@
     <h2 class="titulo">Solo para administradores</h2>
     <p class="pequeno tenue">Aquí se crean y eliminan estaciones y líneas, se cierran estaciones, se editan recorridos y se deshacen cambios. Cada cambio pide el PIN y queda guardado.</p>
     <button class="boton boton-primario" onclick={desbloquear} disabled={desbloqueando && !!pedido}><Icono nombre="abierto" tam={18} />Entrar con PIN</button>
+    <p class="pin-visible">el PIN es <strong class="num">2523</strong></p>
   </section>
 {:else}
   <div class="pestanas-admin">
@@ -456,6 +457,9 @@
 {/if}
 
 <style>
+  .pin-visible { margin-top: 6px; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; text-align: center; }
+  .pin-visible strong { display: block; font-size: 56px; font-weight: 800; letter-spacing: 0.08em; color: var(--rojo); }
+
   .cabeza { padding: 8px 4px 18px; }
   .fila-titulo { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .bloquear { gap: 6px; min-height: 36px; padding: 0 14px; font-size: 14px; }
