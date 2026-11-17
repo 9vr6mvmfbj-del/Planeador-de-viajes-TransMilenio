@@ -46,6 +46,7 @@
   $effect(() => { if (autofoco) entrada?.focus(); });
   let exacta = $derived(sugerencias.some((s) => s.n === consulta));
 
+  // Se elige con un toque (click), no al apoyar el dedo: así deslizar la lista la desplaza sin elegir nada.
   function elegir(n) {
     valor = n;
     abierto = false;
@@ -88,7 +89,7 @@
       bind:value={valor}
       onfocus={() => { abierto = true; }}
       oninput={() => { abierto = true; activo = -1; }}
-      onblur={() => setTimeout(() => (abierto = false), 120)}
+      onblur={() => setTimeout(() => (abierto = false), 200)}
       onkeydown={tecla}
     />
     {#if valor}
@@ -102,7 +103,7 @@
     <ul class="lista-sug vidrio vidrio-flotante" id={id + '-lista'} role="listbox">
       {#each sugerencias as s, i (s.n)}
         <li role="option" aria-selected={i === activo}>
-          <button class:activo={i === activo} onpointerdown={(e) => { e.preventDefault(); elegir(s.n); }}>
+          <button class:activo={i === activo} onmousedown={(e) => e.preventDefault()} onclick={() => elegir(s.n)}>
             <span class="pin" class:cerrada={s.cerrada}></span>
             <span class="nombre"><Resaltado texto={s.n} {consulta} /></span>
             {#if s.cerrada}<span class="estado estado-cerrada">Cerrada</span>{/if}
@@ -111,7 +112,7 @@
       {/each}
       {#if permitirNueva && valor.trim() && !exacta}
         <li role="option" aria-selected="false">
-          <button onpointerdown={(e) => { e.preventDefault(); elegir(valor.trim().toUpperCase()); }}>
+          <button onmousedown={(e) => e.preventDefault()} onclick={() => elegir(valor.trim().toUpperCase())}>
             <span class="pin nueva"><Icono nombre="mas" tam={12} grosor={3} /></span>
             <span class="nombre">Crear “{valor.trim().toUpperCase()}”</span>
           </button>
@@ -142,8 +143,10 @@
     padding: 6px;
     background: var(--vidrio-fuerte); /* más opaca que el vidrio normal: se lee bien sobre lo que tapa */
     border-radius: 18px;
-    max-height: 320px;
-    overflow: auto;
+    max-height: min(320px, 38dvh);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     overscroll-behavior: contain;
     transform-origin: top center; /* nace desde el campo que lo abrió */
     transition: opacity 180ms ease, transform 180ms var(--salida);

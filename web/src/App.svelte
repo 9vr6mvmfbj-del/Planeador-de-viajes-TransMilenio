@@ -25,6 +25,11 @@
     return { duration: reducido ? 100 : 180, css: (t) => `opacity:${t}` };
   }
 
+  // Mientras se escribe en un campo (teclado abierto) el menú de abajo se esconde: no tapa las sugerencias.
+  const escribe = (el) => el instanceof HTMLInputElement && ['text', 'search', 'number', 'time', 'password', 'tel'].includes(el.type);
+  function alEnfocar(e) { if (escribe(e.target)) document.body.classList.add('tecleando'); }
+  function alDesenfocar() { setTimeout(() => { if (!escribe(document.activeElement)) document.body.classList.remove('tecleando'); }, 60); }
+
   // Pantalla de entrada: se muestra al abrir la app (el motor carga mientras tanto).
   let intro = $state(true);
 
@@ -37,6 +42,8 @@
     }
   });
 </script>
+
+<svelte:document onfocusin={alEnfocar} onfocusout={alDesenfocar} />
 
 <Malla acento={acento.color} />
 

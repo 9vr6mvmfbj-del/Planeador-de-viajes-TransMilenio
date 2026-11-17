@@ -394,7 +394,10 @@
     -webkit-user-select: none;
     user-select: none;
     contain: layout style;    /* lo que pase adentro no obliga a recalcular la página */
+    transition: opacity 180ms ease, transform 260ms cubic-bezier(0.23, 1, 0.32, 1);
   }
+  /* con el teclado abierto se esconde (en escritorio la barra inferior no existe) */
+  :global(body.tecleando) .barra { opacity: 0; transform: translateY(24px) scale(0.96); pointer-events: none; }
   .cristal { position: absolute; inset: 0; border-radius: inherit; }
   /* borde de luz del vidrio (como el de iOS): más fuerte arriba a la izquierda y abajo a la derecha */
   .barra::after {
