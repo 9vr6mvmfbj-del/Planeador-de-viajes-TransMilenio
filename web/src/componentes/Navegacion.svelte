@@ -324,7 +324,7 @@
     <div class="marca">
       <span class="logo" aria-hidden="true">T</span>
       <div>
-        <p class="subtitulo">TransMilenio</p>
+        <p class="subtitulo">TransmiTrack</p>
         <p class="mini tenue">Planeador · motor_boff</p>
       </div>
     </div>

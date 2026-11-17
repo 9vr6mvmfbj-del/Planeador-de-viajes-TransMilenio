@@ -1,7 +1,7 @@
 {
-  "name": "Planeador TransMilenio",
-  "short_name": "TransMi",
-  "description": "Planeador de viajes TransMilenio con el motor motor_boff.",
+  "name": "TransmiTrack",
+  "short_name": "TransmiTrack",
+  "description": "TransmiTrack: planeador de viajes TransMilenio con el motor motor_boff.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f2f2f7",
