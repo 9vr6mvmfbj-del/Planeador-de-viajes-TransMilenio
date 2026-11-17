@@ -11,7 +11,9 @@ Planeador de viajes con la red real de TransMilenio (GTFS de julio de 2021).
 | Conversión GTFS → CSV | `conversion/` | Python |
 | Datos | `datos/` | `estaciones.csv`, `rutas.csv`, `horarios.csv` |
 
-**App publicada:** https://planeador-transmilenio.netlify.app
+## App desplegada
+
+https://planeador-transmilenio.netlify.app
 
 ## Arrancar la app (un solo comando)
 
@@ -32,7 +34,7 @@ nada de los requisitos por su cuenta:
 | Estaciones | R1 estado, R2, R3 rango, R4 próximo bus y horarios, R6 ranking |
 | Admin (con PIN) | Crear/eliminar estaciones y líneas, R7 editar recorridos, R8 cerrar/reabrir, R9 historial con deshacer/rehacer de cualquier cambio |
 | Fila | R10 simular_fila (hasta 800.000 pasajeros) |
-| Rendimiento | R11 panel: n, 2n… 16n por operación, con la curva esperada |
+| Rendimiento | R11 panel (redes de 10.000 a 80.000 estaciones, pendiente log-log) y consola para probar el contrato a mano |
 
 Diseño: estilo Apple de CORE I con Liquid Glass (material nativo de iOS 26 Safari con
 `-apple-visual-effect`, y desenfoque + brillo en los demás navegadores), modo claro/oscuro,
@@ -42,8 +44,8 @@ sin zoom al escribir y animaciones con las curvas de Emil Kowalski (respetan "re
 ## Comandos del motor
 
 ```bash
-make pruebas       # 636 pruebas: casos borde de R1–R10, panel de admin y R5 contra fuerza bruta en la red real
-make rendimiento   # mide cómo crece cada operación al duplicar la red (n, 2n, 4n, 8n, 16n)
+make pruebas       # 941 pruebas: casos borde de R1–R10, panel de admin y R5 contra fuerza bruta en la red real
+make rendimiento   # mide cada operación en redes de 10.000, 20.000, 40.000 y 80.000 estaciones
 make prohibidos    # revisa que motor/ no use nada prohibido
 make wasm          # compila el motor a WebAssembly para la app (clang + wasi-libc)
 ```
@@ -94,7 +96,14 @@ Estructuras propias en `motor/estructuras/`: `TablaHash` (encadenamiento, factor
 `ArbolAVL`, `ListasDeRutas` (listas doblemente enlazadas), `Pila`, `Cola` (arreglo circular),
 `ordenarMezcla` (merge sort) y `primeraPosicionNoMenor` (búsqueda binaria).
 
-## Formato de respuestas (supuestos hasta tener el enunciado completo)
+## Probar el contrato a mano (motor en C++)
+
+Como el motor no es Python, los casos se corren desde la app: pestaña **Rendimiento → Probar el contrato
+del motor**. Se elige el método (R1–R10), se escriben los argumentos y se ve lo que devuelve el motor como
+en Python (`None`, `True`, listas y tuplas). Con **Cargar otra red (3 CSV)** se prueba sobre cualquier red con
+el formato de los tres CSV. Ejemplo de R10: `simular_fila([30, 5, 5, 70], 60, 2)` → `[120, 60, 60, 120]`.
+
+## Formato de respuestas (contrato)
 
 | Llamada | Devuelve |
 |---|---|
