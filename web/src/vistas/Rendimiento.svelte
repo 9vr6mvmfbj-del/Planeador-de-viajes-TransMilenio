@@ -8,6 +8,7 @@
   import { pendiente, veredicto, CLASES } from '../lib/redes.js';
   import Icono from '../componentes/Icono.svelte';
   import Palabras from '../componentes/Palabras.svelte';
+  import Contrato from '../componentes/Contrato.svelte';
 
   const DE_NATIVO = () => nativo.estaciones.map((n, i) => ({
     estaciones: n,
@@ -185,6 +186,8 @@
   </section>
 </div>
 {/if}
+
+<Contrato />
 
 <style>
   .cabeza { padding: 8px 4px 18px; display: grid; gap: 10px; }
