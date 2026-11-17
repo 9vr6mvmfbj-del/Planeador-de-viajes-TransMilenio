@@ -9,6 +9,7 @@
   import Icono from '../componentes/Icono.svelte';
   import Palabras from '../componentes/Palabras.svelte';
   import Contrato from '../componentes/Contrato.svelte';
+  import Orbe from '../componentes/Orbe.svelte';
 
   const DE_NATIVO = () => nativo.estaciones.map((n, i) => ({
     estaciones: n,
@@ -197,11 +198,11 @@
 
 {#if midiendo}
   <div class="capa-midiendo" role="status" aria-live="polite">
-    <div class="ventana vidrio vidrio-flotante">
-      <div class="orbe" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
-      <p class="titulo">Midiendo…</p>
+    <div class="ventana">
+      <Orbe tam={230} />
+      <p class="titulo">Midiendo<span class="puntos" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></p>
       <p class="pequeno tenue">{progreso || 'Preparando…'}</p>
-      <p class="mini tenue num">{redes.length} de {fuente === 'dispositivo' ? 4 : redes.length + 1} redes listas</p>
+      {#if fuente === 'dispositivo'}<div class="avance" aria-label="{redes.length} de 4 redes listas">{#each [0, 1, 2, 3] as i}<i class:lista={i < redes.length}></i>{/each}</div>{/if}
     </div>
   </div>
 {/if}
@@ -225,29 +226,23 @@
   .fila-op[aria-pressed='true'] .ir { color: var(--rojo); transform: translateX(2px); }
   .fila-op:active { transform: scale(0.985); }
 
-  /* ventana de "Midiendo…": fondo borroso y un orbe que gira mientras el motor trabaja */
+  /* "Midiendo…": toda la pantalla se desenfoca y el orbe flota al centro, sin caja */
   .capa-midiendo {
     position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px;
-    background: color-mix(in srgb, var(--fondo) 38%, transparent);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2);
-    animation: capa-entra 260ms ease both;
+    background: radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--fondo) 30%, transparent), color-mix(in srgb, var(--fondo) 74%, transparent) 70%);
+    -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
+    animation: capa-entra 320ms ease both;
   }
-  .ventana {
-    display: grid; justify-items: center; gap: 8px; text-align: center;
-    width: min(320px, 100%); padding: 30px 24px 24px; border-radius: 30px; background: var(--vidrio-fuerte);
-    animation: ventana-entra 420ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
-  }
-  .orbe { position: relative; width: 112px; height: 112px; margin-bottom: 10px; }
-  .orbe i, .orbe b { position: absolute; inset: 0; border-radius: 50%; }
-  .orbe i:nth-child(1) { background: conic-gradient(from 0deg, #ff2d46, #ffb020, #12d6b6, #2f7dff, #b14dff, #ff2d46); filter: blur(10px); opacity: 0.9; animation: orbe-gira 2.6s linear infinite; }
-  .orbe i:nth-child(2) { inset: 8px; background: conic-gradient(from 180deg, #2f7dff, #ff2d46, #ffb020, #2f7dff); filter: blur(5px); animation: orbe-gira 1.7s linear infinite reverse; }
-  .orbe i:nth-child(3) { inset: 18px; background: radial-gradient(circle at 34% 30%, #ffffff, #ffd9de 26%, #ff3b55 62%, #7a0b2a 100%); box-shadow: inset 0 -8px 18px rgba(0, 0, 0, 0.28), 0 0 26px rgba(255, 60, 85, 0.6); animation: orbe-late 1.5s ease-in-out infinite; }
-  .orbe b { inset: 26px 40px 58px 30px; background: radial-gradient(closest-side, rgba(255, 255, 255, 0.9), transparent); filter: blur(2px); animation: orbe-late 1.5s ease-in-out infinite; }
-  @keyframes orbe-gira { to { transform: rotate(360deg); } }
-  @keyframes orbe-late { 50% { transform: scale(1.07); } }
+  .ventana { display: grid; justify-items: center; gap: 6px; text-align: center; }
+  .ventana .titulo { font-size: 26px; letter-spacing: -0.02em; margin-top: 4px; }
+  .puntos i { display: inline-block; animation: punto 1.2s ease-in-out infinite; }
+  .puntos i:nth-child(2) { animation-delay: 0.15s; } .puntos i:nth-child(3) { animation-delay: 0.3s; }
+  .avance { display: flex; gap: 6px; margin-top: 10px; }
+  .avance i { width: 26px; height: 5px; border-radius: 3px; background: var(--relleno-2); transition: background-color 400ms ease, box-shadow 400ms ease; }
+  .avance i.lista { background: var(--rojo); box-shadow: 0 0 12px var(--rojo); }
+  @keyframes punto { 0%, 60%, 100% { opacity: 0.25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
   @keyframes capa-entra { from { opacity: 0; } }
-  @keyframes ventana-entra { from { opacity: 0; transform: scale(0.86) translateY(10px); } }
-  @media (prefers-reduced-motion: reduce) { .orbe i, .orbe b, .dedo::after { animation-duration: 6s; } .ventana { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .puntos i, .dedo::after { animation-duration: 6s; } }
 
   .cabeza { padding: 8px 4px 18px; display: grid; gap: 10px; }
   .fila-titulo { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }

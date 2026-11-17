@@ -16,7 +16,7 @@
   import Segmentado from '../componentes/Segmentado.svelte';
   import TecladoPin from '../componentes/TecladoPin.svelte';
   import Palabras from '../componentes/Palabras.svelte';
-  import Cargando from '../componentes/Cargando.svelte';
+  import Orbe from '../componentes/Orbe.svelte';
   import { buscar, normalizar } from '../lib/busqueda.js';
 
   let seccion = $state('estaciones');
@@ -222,7 +222,7 @@
 
 {#if abriendo}
   <section class="vidrio tarjeta bloqueo aparece" aria-live="polite">
-    <Cargando tam={34} />
+    <Orbe tam={150} />
     <h2 class="titulo">Verificando acceso…</h2>
     <p class="pequeno tenue">Abriendo el panel de administración</p>
   </section>

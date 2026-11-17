@@ -100,8 +100,7 @@ Estructuras propias en `motor/estructuras/`: `TablaHash` (encadenamiento, factor
 
 Como el motor no es Python, los casos se corren desde la app: pestaña **Rendimiento → Probar el contrato
 del motor**. Se elige el método (R1–R10), se escriben los argumentos y se ve lo que devuelve el motor como
-en Python (`None`, `True`, listas y tuplas). Con **Cargar otra red (3 CSV)** se prueba sobre cualquier red con
-el formato de los tres CSV. Ejemplo de R10: `simular_fila([30, 5, 5, 70], 60, 2)` → `[120, 60, 60, 120]`.
+en Python (`None`, `True`, listas y tuplas). Ejemplo de R10: `simular_fila([30, 5, 5, 70], 60, 2)` → `[120, 60, 60, 120]`.
 
 ## Formato de respuestas (contrato)
 

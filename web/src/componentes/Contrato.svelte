@@ -1,8 +1,8 @@
 <script>
   // Probar el contrato del motor a mano: cada llamada de R1 a R10 con sus argumentos y lo que devuelve,
   // escrito como lo devolvería Python (None, True, listas y tuplas), para comprobar los resultados sobre
-  // la red cargada. También deja cargar otra red con los tres CSV. La app no calcula nada: solo llama al motor.
-  import { app, motor, huboCambio, cargarOtraRed, avisar } from '../lib/estado.svelte.js';
+  // la red cargada.  La app no calcula nada: solo llama al motor.
+  import { app, motor, huboCambio } from '../lib/estado.svelte.js';
 
   const s = (v) => "'" + String(v).replaceAll('\\', '\\\\').replaceAll("'", "\\'") + "'";
   const lista = (v) => '[' + v.join(', ') + ']';
@@ -35,9 +35,6 @@
   let elegido = $state(0);
   let valores = $state(METODOS.map((m) => m.args.map((a) => a[2])));
   let historial = $state(/** @type {{ llamada: string, resultado: string }[]} */ ([]));
-  let cargando = $state(false);
-  let error = $state('');
-  let entrada = $state(/** @type {HTMLInputElement | undefined} */ (undefined));
 
   let metodo = $derived(METODOS[elegido]);
 
@@ -53,22 +50,6 @@
     if (m.cambia) huboCambio();
     historial = [{ llamada: texto(m, crudos), resultado }, ...historial].slice(0, 12);
   }
-
-  async function cargarRed(e) {
-    const archivos = [...(e.currentTarget.files ?? [])];
-    e.currentTarget.value = '';
-    const buscar = (c) => archivos.find((f) => f.name.toLowerCase().includes(c));
-    const [fe, fr, fh] = [buscar('estacion'), buscar('ruta'), buscar('horario')];
-    if (!fe || !fr || !fh) { error = 'Elige los tres archivos a la vez: estaciones.csv, rutas.csv y horarios.csv.'; return; }
-    error = ''; cargando = true;
-    try {
-      const t0 = performance.now();
-      const r = cargarOtraRed(await fe.text(), await fr.text(), await fh.text());
-      historial = [{ llamada: 'Red(carpeta)', resultado: `cargó ${r.estaciones.toLocaleString('es-CO')} estaciones, ${r.rutas.toLocaleString('es-CO')} rutas y ${r.horarios.toLocaleString('es-CO')} horarios en ${(performance.now() - t0).toFixed(0)} ms` }, ...historial].slice(0, 12);
-      avisar('Red cargada');
-    } catch (err) { error = String(err); }
-    cargando = false;
-  }
 </script>
 
 <section class="vidrio tarjeta contrato" aria-labelledby="titulo-contrato">
@@ -80,12 +61,6 @@
     <strong class="num">{app.resumen.horarios.toLocaleString('es-CO')}</strong> horarios. Cada llamada va directo al motor
     y muestra lo que devuelve como en Python (<code>None</code>, <code>True</code>, listas y tuplas).
   </p>
-  <div class="barra">
-    <button class="boton" onclick={() => entrada?.click()} disabled={cargando}>{cargando ? 'Cargando…' : 'Cargar otra red (3 CSV)'}</button>
-    <input bind:this={entrada} class="oculto" type="file" accept=".csv,text/csv" multiple onchange={cargarRed} />
-  </div>
-  {#if error}<p class="pequeno error">{error}</p>{/if}
-
   <div class="formulario">
     <label class="campo-etiqueta">
       <span class="mini tenue">Método</span>
@@ -118,9 +93,6 @@
 
 <style>
   .contrato { display: grid; gap: 12px; margin-top: 14px; }
-  .barra { display: flex; gap: 8px; flex-wrap: wrap; }
-  .oculto { display: none; }
-  .error { color: var(--naranja); }
   .formulario { display: grid; gap: 10px; }
   .campo-etiqueta { display: grid; gap: 4px; }
   .salidas { list-style: none; display: grid; gap: 8px; }

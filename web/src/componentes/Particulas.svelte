@@ -5,7 +5,7 @@
   //  · Avanza sola desde que se abre. Se puede mover con el dedo: arrastrando el mango de la línea de
   //    tiempo o la escena.
   //  · Al soltar conserva el impulso del gesto (inercia que frena sola) y enseguida sigue sola,
-  //    acelerando suave (1 minuto simulado ≈ 0,9 s).
+  //    acelerando suave (1 minuto simulado ≈ 0,5 s).
   //  · La simulación ilustrativa es determinista: ir atrás o adelante a la misma hora da lo mismo.
   import { onMount } from 'svelte';
   let { llegadas, duracion, frecuencia, capacidad, pasajeros } = $props();
@@ -17,7 +17,7 @@
   // (tope de ~1.400 puntos: con 800.000 pasajeros el celular sigue dibujando fluido)
   let k = $derived(Math.max(1, Math.ceil(pasajeros / 1400), Math.min(Math.ceil(pasajeros / 700), Math.floor(capacidad / 3))));
   let porMinuto = $derived.by(() => { const c = new Float32Array(duracion + 1); for (let i = 0; i < llegadas.length; i++) c[Math.min(duracion, Math.floor(llegadas[i] / 60))]++; return c; }); // llegadas viene en segundos
-  let segundos = $derived(Math.min(240, Math.max(60, duracion * 0.9))); // lo que dura la hora pico en pantalla (≈ 1 s por minuto: da tiempo de leer)
+  let segundos = $derived(Math.min(150, Math.max(40, duracion * 0.5))); // lo que dura la hora pico en pantalla (≈ medio segundo por minuto: se alcanza a leer sin aburrir)
   let minPorSeg = $derived(duracion / segundos);
 
   // ------------------------------------------------------------ simulación ilustrativa (por minuto)
