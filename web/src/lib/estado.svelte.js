@@ -44,6 +44,15 @@ export async function iniciar() {
   }
 }
 
+// Reemplaza la red cargada por otra con el mismo formato de los tres CSV (para probar el motor con redes del profesor).
+// No toca los cambios del Admin guardados: al recargar la app vuelve la red original.
+export function cargarOtraRed(estaciones, rutas, horarios) {
+  const r = motor().cargar(estaciones, rutas, horarios);
+  app.servicio = jornada(horarios);
+  huboCambio();
+  return r;
+}
+
 // Llamar después de cualquier operación que cambie la red.
 export function huboCambio() {
   app.version++;
