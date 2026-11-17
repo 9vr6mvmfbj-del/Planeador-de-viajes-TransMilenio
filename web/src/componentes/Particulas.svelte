@@ -2,9 +2,10 @@
   // La fila de abordaje, en vivo. SOLO ILUSTRA: cada punto agrupa k pasajeros y usa los mismos datos
   // (llegadas, frecuencia, capacidad); las cifras de verdad las calcula el motor (R10) en Fila.svelte.
   //
-  //  · Empieza quieta. Se mueve con el dedo: arrastrando el mango de la línea de tiempo o la escena.
-  //  · Al soltar conserva el impulso del gesto (inercia que frena sola) y, exactamente 3 s después de
-  //    soltar, vuelve a avanzar sola acelerando suave (1 minuto simulado ≈ 0,25 s).
+  //  · Avanza sola desde que se abre. Se puede mover con el dedo: arrastrando el mango de la línea de
+  //    tiempo o la escena.
+  //  · Al soltar conserva el impulso del gesto (inercia que frena sola) y enseguida sigue sola,
+  //    acelerando suave (1 minuto simulado ≈ 0,25 s).
   //  · La simulación ilustrativa es determinista: ir atrás o adelante a la misma hora da lo mismo.
   import { onMount } from 'svelte';
   import Numero from './Numero.svelte';
@@ -15,7 +16,7 @@
 
   // cada punto ≈ k pasajeros: un bus se lleva unos pocos puntos y nunca hay más de ~3.000 en pantalla
   let k = $derived(Math.max(1, Math.ceil(pasajeros / 3000), Math.min(Math.ceil(pasajeros / 700), Math.floor(capacidad / 3))));
-  let porMinuto = $derived.by(() => { const c = new Float32Array(duracion + 1); for (let i = 0; i < llegadas.length; i++) c[llegadas[i]]++; return c; });
+  let porMinuto = $derived.by(() => { const c = new Float32Array(duracion + 1); for (let i = 0; i < llegadas.length; i++) c[Math.min(duracion, Math.floor(llegadas[i] / 60))]++; return c; }); // llegadas viene en segundos
   let segundos = $derived(Math.min(60, Math.max(24, duracion * 0.25))); // lo que dura la hora pico en pantalla
   let minPorSeg = $derived(duracion / segundos);
 
@@ -63,9 +64,9 @@
   // ------------------------------------------------------------ reloj y control (física tipo iOS)
   let t = $state(0);            // minuto simulado (con decimales)
   let enFila = $state(0);
-  // modo: 'quieto' (al entrar) · 'arrastre' (dedo encima) · 'suelto' (inercia + cuenta de 3 s) · 'auto'
-  let modo = $state('quieto');
-  let reanuda = $state(0);      // 0..1 progreso de los 3 s
+  // modo: 'auto' (avanza sola) · 'arrastre' (dedo encima) · 'suelto' (inercia del gesto, luego sigue sola)
+  let modo = $state('auto');
+  let reanuda = 0;
   let visible = false;
   let esperaHasta = 0;          // pausa al final antes de repetir
   let vel = 0;                  // velocidad actual (min simulados por segundo)
@@ -75,9 +76,9 @@
   function reiniciar() {
     sim = nuevaSim();
     fin = calcularFin();
-    const inicio = Math.round(duracion * 0.5); // arranca quieta a mitad de la hora pico (variable local: el efecto no depende de t)
+    const inicio = 0; // arranca sola desde el comienzo de la hora pico (variable local: el efecto no depende de t)
     t = inicio;
-    modo = 'quieto';
+    modo = 'auto';
     vel = 0;
     saltar(inicio);
   }
@@ -263,8 +264,8 @@
           if (t <= 0 || t >= fin) vel = 0;
           animar = vel > 0;
         }
-        reanuda = Math.min(1, (ahora - soltadoEn) / 3000);
-        if (reanuda >= 1) { modo = 'auto'; reanuda = 0; if (vel < 0) vel = 0; }
+        // sin cuenta regresiva: cuando la inercia se acaba (o va hacia adelante) sigue sola
+        if (Math.abs(vel) <= 0.05 || (vel > 0 && vel <= minPorSeg)) { modo = 'auto'; if (vel < 0) vel = 0; }
       } else if (modo === 'auto' && !reducido) {
         // retoma: la velocidad crece suave hasta la normal (no arranca de golpe)
         vel += (minPorSeg - vel) * (1 - Math.exp(-dt * 2.4));
@@ -320,12 +321,8 @@
   <div class="pie-tiempo mini tenue num">
     <span>{aHora(0)}</span>
     <span class="estado-tiempo">
-      {#if modo === 'suelto'}
-        <svg class="anillo" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" /><circle class="progreso" cx="10" cy="10" r="8" style="stroke-dashoffset:{50.3 * (1 - reanuda)}" /></svg>
-        Sigue sola en {Math.max(1, Math.ceil(3 - reanuda * 3))} s
-      {:else if modo === 'arrastre'}Suelta para que siga sola
-      {:else if modo === 'auto'}<span class="punto-vivo" aria-hidden="true"></span>En vivo · toca para mover la hora
-      {:else}Arrastra la fila o el punto para mover la hora{/if}
+      {#if modo === 'arrastre'}Suelta para que siga sola
+      {:else}<span class="punto-vivo" aria-hidden="true"></span>En vivo · toca para mover la hora{/if}
     </span>
     <span>{aHora(fin)}</span>
   </div>
@@ -365,9 +362,6 @@
   @keyframes latido { 50% { opacity: 0.35; } }
   .pie-tiempo { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 2px; }
   .estado-tiempo { display: inline-flex; align-items: center; gap: 6px; color: var(--tinta-2); font-weight: 600; text-align: center; }
-  .anillo { width: 14px; height: 14px; transform: rotate(-90deg); }
-  .anillo circle { fill: none; stroke: var(--relleno-2); stroke-width: 3; }
-  .anillo .progreso { stroke: var(--rojo); stroke-dasharray: 50.3; transition: stroke-dashoffset 60ms linear; }
   .nota { margin-top: 8px; }
   @media (max-width: 380px) { .rotulo { display: none; } }
 </style>
