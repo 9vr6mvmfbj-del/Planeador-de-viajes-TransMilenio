@@ -288,29 +288,40 @@ pasajero entra y sale de la cola una vez: **O(P)** la simulación, más **O(P lo
 
 ## Rendimiento medido (base del panel R11)
 
-`make rendimiento` genera redes sintéticas de 150, 300, 600, 1.200 y 2.400 estaciones (con rutas y
-horarios proporcionales) y mide cada operación (µs por operación, mejor de 9):
+Mismo método del profesor: cada operación del contrato (menos R5) se corre en redes de **10.000, 20.000,
+40.000 y 80.000 estaciones** (generadas con el formato de los tres CSV: n/4 rutas de 10 paradas y 8 horarios por
+parada), con las mismas consultas y la **mediana** de varias repeticiones. Con los cuatro puntos se calcula la
+**pendiente** de log(tiempo) contra log(n): 0 = constante, 1 = lineal. R10 se mide con P = 10 × n pasajeros
+desordenados. Resultado de `make rendimiento` (C++ nativo):
 
-| Operación | Esperado | n | 2n | 4n | 8n | 16n |
+| Operación | Esperado | 10.000 | 20.000 | 40.000 | 80.000 | Pendiente |
 |---|---|---|---|---|---|---|
-| R1 estado | O(1) | 0,055 | ×0,83 | ×1,07 | ×1,05 | ×1,08 |
-| R2 autocompletar | O(log n + k) | 0,144 | ×1,07 | ×1,28 | ×1,37 | ×1,42 |
-| R3 rango (20) | O(log n + m) | 0,567 | ×1,17 | ×1,40 | ×0,93 | ×1,12 |
-| R4 próximo bus | O(1) + O(log h) | 0,225 | ×0,85 | ×1,30 | ×1,50 | ×1,32 |
-| R6 ranking (10) | O(log n + k) | 0,245 | ×0,86 | ×0,95 | ×1,00 | ×1,15 |
-| R7 agregar + quitar | O(1) + O(log n) | 0,230 | ×1,03 | ×1,06 | ×1,15 | ×2,10* |
-| R7 recorrido | O(L) | 0,226 | ×1,05 | ×1,04 | ×1,17 | ×1,28 |
-| R8 cerrar + reabrir | O(log n) | 0,612 | ×1,13 | ×1,12 | ×1,20 | ×1,12 |
-| R9 deshacer + rehacer | O(log n) | 0,201 | ×1,33 | ×1,51 | ×0,79 | ×1,21 |
-| R10 simular_fila | O(P) | 912 | ×2,07 | ×2,16 | ×1,85 | ×2,13 |
+| R1 estado | O(1) | 0,060 µs | 0,131 µs | 0,143 µs | 0,254 µs | 0,64 |
+| R2 autocompletar (k=10) | O(log n + k) | 0,532 µs | 0,470 µs | 0,438 µs | 0,489 µs | -0,05 |
+| R3 rango (20 resultados) | O(log n + m) | 1,237 µs | 1,273 µs | 1,652 µs | 3,066 µs | 0,43 |
+| R4 proximo_bus | O(1) + O(log h) | 0,257 µs | 0,518 µs | 0,641 µs | 1,215 µs | 0,70 |
+| R5 viaje (no se mide) | O(L_o + L_d) | 0,460 µs | 1,198 µs | 1,504 µs | 2,128 µs | 0,70 |
+| R6 ranking (k=10) | O(log n + k) | 0,201 µs | 0,225 µs | 0,225 µs | 0,218 µs | 0,03 |
+| R7 agregar + quitar parada | O(log n) | 0,580 µs | 0,797 µs | 0,867 µs | 1,865 µs | 0,52 |
+| R7 recorrido | O(L) | 0,329 µs | 0,622 µs | 0,804 µs | 1,103 µs | 0,56 |
+| R8 cerrar + reabrir | O(log n) | 1,390 µs | 2,070 µs | 3,314 µs | 4,665 µs | 0,59 |
+| R9 deshacer + rehacer | O(log n) | 0,376 µs | 0,394 µs | 0,425 µs | 0,484 µs | 0,12 |
+| R10 simular_fila (P = 10 n) | O(P log P) | 9,1 ms | 20,2 ms | 51,9 ms | 87,6 ms | 1,12 |
+| Red(carpeta): carga | O(n) | 55 ms | 157 ms | 260 ms | 592 ms | 1,10 |
 
-**Cómo leerlo:** si al duplicar n el tiempo queda igual (×1) es O(1); si sube un poco y cada vez menos
-es O(log n); si se duplica (×2) es O(n). R10 se duplica porque su n son los pasajeros.
+**Cómo leerlo:** una operación O(1) u O(log n) debe dar una pendiente cercana a 0; una lineal, cercana a 1; una
+n log n, un poco más de 1. R10 da ≈ 1,1 (ordena las llegadas con merge sort y luego la cola es O(P)) y la carga
+de la red ≈ 1 (lee cada fila de los CSV una vez).
 
-**Cuando la medición no coincide con la teoría:** las operaciones O(1) suben un poco (×1,05–×1,5) porque
-con redes más grandes las tablas ya no caben en la memoria caché del procesador y cada acceso es algo
-más lento; no es el algoritmo. (*) Los saltos aislados como ×2,10 aparecen en una corrida y no en otra:
-son ruido del computador (otro proceso usando el procesador en ese momento).
+**Cuando la medición no coincide con la teoría:** varias operaciones O(1) y O(log n) dan pendientes de 0,3 a 0,7
+en vez de ≈ 0. No es el algoritmo: el número de pasos es el mismo en las cuatro redes. El motor en C++ responde
+en decenas o cientos de nanosegundos, y a esa escala manda la memoria caché: con 10.000 estaciones la tabla hash
+y los árboles caben en la caché del procesador; con 80.000 ya no, y cada acceso a una estación al azar tiene que
+ir a la memoria principal. En un motor en Python ese efecto queda escondido porque cada llamada cuesta mucho más.
+
+**En el panel:** el botón **Medir 10k a 80k aquí** repite la medición en el dispositivo (WebAssembly) y
+**Agregar una red (3 CSV)** mide cualquier red del mismo formato; con dos o más redes se calcula la pendiente y
+cada operación dice si coincide con lo esperado y, si no, por qué.
 
 ## Conversión del GTFS
 
