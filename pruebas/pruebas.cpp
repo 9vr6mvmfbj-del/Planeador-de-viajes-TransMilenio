@@ -192,6 +192,45 @@ static void pruebasOperacion() {
     CHECK(!red.rehacer());
 }
 
+// Casos borde de R1, R2 y R3 sobre la red pequeña (estaciones: A B C D E X Y Z "CALLE 26" "CALLE 30" "CALLE 80").
+static void pruebasBordeEstaciones() {
+    std::printf("Casos borde R1, R2 y R3\n");
+    Red red("/tmp/red_pequena");
+    // R1: estado
+    CHECK(red.estado("") == "NO EXISTE");
+    CHECK(red.estado("   ") == "NO EXISTE");
+    CHECK(red.estado("calle 26") == "ABIERTA");
+    CHECK(red.estado("CALLE 2") == "NO EXISTE");  // un prefijo no es una estación
+    CHECK(red.cerrar("Z"));
+    CHECK(red.estado("Z") == "CERRADA");
+    CHECK(red.reabrir("Z"));
+    CHECK(red.estado("Z") == "ABIERTA");
+    // R2: autocompletar
+    CHECK(red.autocompletar("CALLE 3", 5) == V({"CALLE 30"}));
+    CHECK(red.autocompletar("CALLE 26", 5) == V({"CALLE 26"}));  // el prefijo es la estación completa
+    CHECK(red.autocompletar("CALLE ", 5) == V({"CALLE 26", "CALLE 30", "CALLE 80"}));
+    CHECK(red.autocompletar("CALLE", -1).empty());                // k negativo
+    CHECK(red.autocompletar("", 100).size() == 11);               // k enorme: todas las abiertas, en orden
+    CHECK(red.autocompletar("ZZ", 5).empty());                    // mayor que todas
+    CHECK(red.autocompletar("A", 1) == V({"A"}));
+    CHECK(red.cerrar("CALLE 30"));
+    CHECK(red.autocompletar("CALLE", 5) == V({"CALLE 26", "CALLE 80"}));  // la cerrada no aparece
+    CHECK(red.autocompletar("CALLE 30", 5).empty());
+    CHECK(red.reabrir("CALLE 30"));
+    // R3: rango (inclusive y solo abiertas)
+    CHECK(red.rango("B", "B") == V({"B"}));                       // mismo extremo
+    CHECK(red.rango("CA", "CALLE 30") == V({"CALLE 26", "CALLE 30"}));  // extremos que no existen
+    CHECK(red.rango("C", "CALLE 27") == V({"C", "CALLE 26"}));
+    CHECK(red.rango("", "~").size() == 11);                       // toda la red
+    CHECK(red.rango("ZZ", "ZZZ").empty());
+    CHECK(red.rango("E", "A").empty());                           // invertido
+    CHECK(red.cerrar("B"));
+    CHECK(red.rango("A", "C") == V({"A", "C"}));                  // el extremo cerrado no aparece
+    CHECK(red.rango("B", "B").empty());
+    CHECK(red.reabrir("B"));
+    CHECK(red.rango("A", "C") == V({"A", "B", "C"}));
+}
+
 static vector<int> ids(const vector<Red::Cambio>& v) {
     vector<int> r;
     for (const auto& c : v) r.push_back(c.id);
@@ -489,6 +528,7 @@ static void pruebasViajeReal() {
 int main() {
     pruebasBasicas();
     pruebasOperacion();
+    pruebasBordeEstaciones();
     pruebasAdmin();
     pruebasFila();
     pruebasViajeReal();
