@@ -231,6 +231,82 @@ static void pruebasBordeEstaciones() {
     CHECK(red.rango("A", "C") == V({"A", "B", "C"}));
 }
 
+// Casos borde de R7, R8 y R9: ediciones imposibles, cadenas largas de deshacer y rehacer.
+static void pruebasBordeEdicion() {
+    std::printf("Casos borde R7, R8 y R9\n");
+    {
+        Red red("/tmp/red_pequena");
+        CHECK(!red.deshacer());                                   // deshacer sin nada que deshacer
+        CHECK(!red.rehacer());
+        CHECK(!red.cerrar("NADA"));                               // cerrar lo que no existe no es un cambio
+        CHECK(!red.reabrir("A"));                                 // ya estaba abierta
+        CHECK(!red.deshacer());                                   // y por eso tampoco hay nada que deshacer
+        // R7: ediciones que no se pueden
+        CHECK(!red.quitar_parada("NADA", "A"));                   // ruta que no existe
+        CHECK(!red.quitar_parada("R1", "X"));                     // X no está en R1
+        CHECK(!red.quitar_parada("R1", "NADA"));
+        CHECK(!red.agregar_parada("R1", "Z", "NADA"));            // 'despues_de' no existe
+        CHECK(!red.agregar_parada("R1", "Z", "X"));               // 'despues_de' existe pero no está en R1
+        CHECK(!red.agregar_parada("R1", "B", "A"));               // ya está en la ruta
+        CHECK(!red.agregar_parada("R1", "A", "A"));               // después de sí misma
+        CHECK(!red.deshacer());                                   // ninguna de esas fue un cambio
+        CHECK(red.recorrido("R1") == V({"A", "B", "C", "D", "E"}));
+        // quitar la última y la primera, y ver el recorrido en los dos sentidos
+        CHECK(red.quitar_parada("R1", "E"));
+        CHECK(red.recorrido("R1") == V({"A", "B", "C", "D"}));
+        CHECK(red.recorrido("R1", true) == V({"D", "C", "B", "A"}));
+        CHECK(red.quitar_parada("R1", "A"));
+        CHECK(red.recorrido("R1", true) == V({"D", "C", "B"}));
+        CHECK(red.agregar_parada("R1", "Z", "D"));                // agregar después de la última
+        CHECK(red.recorrido("R1") == V({"B", "C", "D", "Z"}));
+        CHECK(red.recorrido("R1", true) == V({"Z", "D", "C", "B"}));
+        CHECK(red.recorrido("NADA", true).empty());
+        // quitar las paradas hasta dejar la ruta vacía y volver a llenarla
+        CHECK(red.quitar_parada("R3", "E"));
+        CHECK(red.quitar_parada("R3", "D"));
+        CHECK(red.recorrido("R3").empty());
+        CHECK(red.recorrido("R3", true).empty());
+        CHECK(red.deshacer());
+        CHECK(red.recorrido("R3") == V({"D"}));
+        CHECK(red.deshacer());
+        CHECK(red.recorrido("R3") == V({"E", "D"}));
+    }
+    {
+        // R8 + R9: cadena larga hasta volver a la red original, y rehacer hasta el final
+        Red red("/tmp/red_pequena");
+        vector<string> original = red.rango("", "~");
+        vector<string> r1 = red.recorrido("R1"), r2 = red.recorrido("R2");
+        auto rank0 = red.ranking(11);
+        CHECK(red.cerrar("A"));
+        CHECK(!red.cerrar("A"));                                  // cerrar dos veces: la segunda no se apila
+        CHECK(red.quitar_parada("R1", "C"));
+        CHECK(red.agregar_parada("R2", "NUEVA", "C"));
+        CHECK(red.cerrar("NUEVA"));
+        CHECK(red.reabrir("A"));
+        int hechos = 0;
+        while (red.deshacer()) hechos++;
+        CHECK(hechos == 5);
+        CHECK(red.rango("", "~") == original);
+        CHECK(red.recorrido("R1") == r1 && red.recorrido("R2") == r2);
+        CHECK(red.ranking(11) == rank0);
+        CHECK(red.estado("NUEVA") == "NO EXISTE");
+        int rehechos = 0;
+        while (red.rehacer()) rehechos++;
+        CHECK(rehechos == 5);
+        CHECK(red.estado("A") == "ABIERTA" && red.estado("NUEVA") == "CERRADA");
+        CHECK(red.recorrido("R1") == V({"A", "B", "D", "E"}));
+        // un cambio nuevo borra lo que había para rehacer
+        CHECK(red.deshacer());
+        CHECK(red.deshacer());
+        CHECK(red.cerrar("X"));
+        CHECK(!red.rehacer());
+        CHECK(red.deshacer());
+        CHECK(red.estado("X") == "ABIERTA");
+        CHECK(red.rehacer());
+        CHECK(red.estado("X") == "CERRADA");
+    }
+}
+
 static vector<int> ids(const vector<Red::Cambio>& v) {
     vector<int> r;
     for (const auto& c : v) r.push_back(c.id);
@@ -529,6 +605,7 @@ int main() {
     pruebasBasicas();
     pruebasOperacion();
     pruebasBordeEstaciones();
+    pruebasBordeEdicion();
     pruebasAdmin();
     pruebasFila();
     pruebasViajeReal();
