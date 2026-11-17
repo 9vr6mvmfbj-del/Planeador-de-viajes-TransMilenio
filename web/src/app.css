@@ -54,29 +54,31 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  /* Oscuro: fondo azul noche (no negro plano) y vidrio con tinte, para que la paleta roja/azul/amarilla
+     del fondo se siga viendo a través de las tarjetas igual que en claro. */
   :root {
-    --fondo: #000000;
-    --fondo-2: #0e0e12;
-    --tinta: #f5f5f7;
-    --tinta-2: #d1d1d6;
-    --tenue: #adadb5;
-    --tenue-2: #6e6e73;
-    --separador: rgba(84, 84, 88, 0.45);
-    --relleno: rgba(118, 118, 128, 0.24);
-    --relleno-2: rgba(118, 118, 128, 0.34);
-    --vidrio: rgba(28, 28, 32, 0.68);
-    --vidrio-fuerte: rgba(34, 34, 38, 0.84);
-    --vidrio-borde: rgba(255, 255, 255, 0.12);
-    --vidrio-brillo: rgba(255, 255, 255, 0.16);
-    --vidrio-sombra: 0 1px 1px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.45);
-    --vidrio-sombra-alta: 0 2px 6px rgba(0, 0, 0, 0.4), 0 24px 60px rgba(0, 0, 0, 0.6);
-    --rojo: #ff3b4e;
-    --rojo-suave: rgba(255, 59, 78, 0.16);
-    --azul: #0a84ff;
-    --verde: #30d158;
-    --verde-suave: rgba(48, 209, 88, 0.16);
-    --naranja: #ff9f0a;
-    --naranja-suave: rgba(255, 159, 10, 0.16);
+    --fondo: #07060d;
+    --fondo-2: #110f1a;
+    --tinta: #f7f6fb;
+    --tinta-2: #dcdae6;
+    --tenue: #b6b3c4;
+    --tenue-2: #7d7a8c;
+    --separador: rgba(140, 135, 165, 0.3);
+    --relleno: rgba(150, 145, 180, 0.2);
+    --relleno-2: rgba(150, 145, 180, 0.32);
+    --vidrio: rgba(34, 30, 48, 0.5);
+    --vidrio-fuerte: rgba(30, 27, 42, 0.94);
+    --vidrio-borde: rgba(255, 255, 255, 0.16);
+    --vidrio-brillo: rgba(255, 255, 255, 0.22);
+    --vidrio-sombra: 0 1px 1px rgba(0, 0, 0, 0.3), 0 12px 34px rgba(3, 2, 10, 0.5);
+    --vidrio-sombra-alta: 0 2px 6px rgba(0, 0, 0, 0.4), 0 24px 60px rgba(3, 2, 10, 0.65);
+    --rojo: #ff4658;
+    --rojo-suave: rgba(255, 70, 88, 0.2);
+    --azul: #4d9dff;
+    --verde: #34d86a;
+    --verde-suave: rgba(52, 216, 106, 0.18);
+    --naranja: #ffab2e;
+    --naranja-suave: rgba(255, 171, 46, 0.18);
   }
 }
 

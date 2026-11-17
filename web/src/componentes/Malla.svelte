@@ -52,7 +52,17 @@
   .velo { position: absolute; inset: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--fondo) 84%, transparent), color-mix(in srgb, var(--fondo) 34%, transparent) 14%, transparent 30%); }
 
   /* en oscuro el color brilla más sobre negro: se baja un poco para no cansar */
-  @media (prefers-color-scheme: dark) { .malla { --v: 0.85; } }
+  @media (prefers-color-scheme: dark) {
+    /* en oscuro: colores más saturados y manchas un poco más chicas, para que se distingan rojo, azul,
+       ámbar y verde en vez de fundirse en un solo rojo apagado */
+    .malla { --v: 0.8; }
+    .rojo-a { --t: 96vmax; background: radial-gradient(closest-side, #ff1f3d, transparent); }
+    .rojo-b { --t: 74vmax; background: radial-gradient(closest-side, #ff3d7a, transparent); }
+    .azul { opacity: calc(0.8 * var(--v)); background: radial-gradient(closest-side, #2f7dff, transparent); }
+    .amarillo { opacity: calc(0.62 * var(--v)); background: radial-gradient(closest-side, #ffb020, transparent); }
+    .verde { opacity: calc(0.62 * var(--v)); background: radial-gradient(closest-side, #12d6b6, transparent); }
+    .velo { background: linear-gradient(180deg, color-mix(in srgb, var(--fondo) 80%, transparent), color-mix(in srgb, var(--fondo) 30%, transparent) 14%, color-mix(in srgb, var(--fondo) 22%, transparent) 100%); }
+  }
   /* celular: pasos de ~1 px, ~8 por segundo (ver nota arriba) */
   @media (pointer: coarse), (max-width: 979px) {
     .rojo-a { animation-timing-function: steps(122); }
