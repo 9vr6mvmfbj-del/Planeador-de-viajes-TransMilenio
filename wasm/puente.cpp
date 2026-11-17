@@ -178,11 +178,20 @@ EXPORTAR const char* m_resumen_fila(const int* llegadas, int n, int frecuencia, 
     return devolver(s);
 }
 
-// R11: mide el crecimiento con redes sintéticas de escala 1, 2, 4, ... maxEscala.
-EXPORTAR const char* m_rendimiento(int maxEscala, int consultas) {
-    std::vector<int> escalas;
-    for (int e = 1; e <= maxEscala; e *= 2) escalas.push_back(e);
-    return devolver(medicion::aJSON(medicion::medirCrecimiento(escalas, consultas, 5)));
+// R11: mide cada operación sobre la red que está cargada (mediana de 'reps' repeticiones, 'consultas' consultas
+// por repetición). Devuelve, en el orden de la tabla, nombre, esperado, clase y µs por operación.
+EXPORTAR const char* m_medir_red(int consultas, int reps) {
+    std::vector<double> t = medicion::medirRed(*red, consultas, reps);
+    std::vector<medicion::Operacion> ops = medicion::operaciones();
+    std::string s = "{\"estaciones\":" + std::to_string(red->num_estaciones()) + ",\"operaciones\":[";
+    char b[64];
+    for (size_t i = 0; i < ops.size() && i < t.size(); i++) {
+        std::snprintf(b, sizeof b, "%.4f", t[i]);
+        if (i) s += ",";
+        s += std::string("{\"nombre\":\"") + ops[i].nombre + "\",\"esperado\":\"" + ops[i].esperado +
+             "\",\"clase\":\"" + medicion::nombreClase(ops[i].clase) + "\",\"us\":" + b + "}";
+    }
+    return devolver(s + "]}");
 }
 
 }  // extern "C"
