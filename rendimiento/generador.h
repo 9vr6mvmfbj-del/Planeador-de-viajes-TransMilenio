@@ -39,8 +39,8 @@ inline std::string horaTexto(int m) {
     return b;
 }
 
-inline RedSintetica generarRed(int escala, uint64_t semilla = 42) {
-    const int S = 150 * escala, R = 180 * escala, L = 10, H = 70;
+// Red de S estaciones, R rutas de L paradas y H horarios por parada (mismo formato de los tres CSV).
+inline RedSintetica generarRedTam(int S, int R, int L, int H, uint64_t semilla = 42) {
     Azar az(semilla);
     RedSintetica red;
     red.estaciones = "nombre\n";
@@ -66,11 +66,17 @@ inline RedSintetica generarRed(int escala, uint64_t semilla = 42) {
         for (int o = 0; o < L; o++) {
             red.rutas += nr + "," + std::to_string(o + 1) + "," + red.nombresEstaciones[ps[o]] + "\n";
             int salida = 270 + az.entero(60);  // primer bus entre 4:30 y 5:30
+            int paso = H > 0 ? 1200 / H : 15;   // reparte los H buses a lo largo de la jornada
             for (int h = 0; h < H; h++) {
-                int m = (salida + h * 15 + o * 3) % 1440;
+                int m = (salida + h * paso + o * 3) % 1440;
                 red.horarios += nr + "," + red.nombresEstaciones[ps[o]] + "," + horaTexto(m) + "\n";
             }
         }
     }
     return red;
+}
+
+// Escala 1 se parece a la red real (150 estaciones, 180 rutas, ~126.000 horarios); escala 2 es el doble de todo.
+inline RedSintetica generarRed(int escala, uint64_t semilla = 42) {
+    return generarRedTam(150 * escala, 180 * escala, 10, 70, semilla);
 }
