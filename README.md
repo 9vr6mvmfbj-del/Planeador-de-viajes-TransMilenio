@@ -13,7 +13,7 @@ Planeador de viajes con la red real de TransMilenio (GTFS de julio de 2021).
 
 ## App desplegada
 
-https://planeador-transmilenio.netlify.app
+https://transmi-track.netlify.app
 
 ## Arrancar la app (un solo comando)
 
