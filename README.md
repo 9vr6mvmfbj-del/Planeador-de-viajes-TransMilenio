@@ -102,7 +102,7 @@ Estructuras propias en `motor/estructuras/`: `TablaHash` (encadenamiento, factor
 | `autocompletar(prefijo, k)`, `rango(desde, hasta)`, `recorrido(...)` | lista de nombres |
 | `ranking(k)` | lista de `(nombre, buses_por_dia)`, de mayor a menor |
 | `proximo_bus(estacion, ruta, hora)` | `"HH:MM"`, o `""` (None) si no hay más ese día |
-| `viaje(origen, destino)` | `Viaje{encontrado, paradas, tramos[{ruta, sube, baja, paradas}]}` |
+| `viaje(origen, destino)` | tramos `(ruta, sube_en, baja_en)`: 1 si es directo, 2 si hay transbordo; `encontrado = false` es None (no hay viaje, estación inexistente o cerrada, o origen = destino) |
 | `agregar_parada`, `quitar_parada`, `cerrar`, `reabrir`, `deshacer`, `rehacer` | `true` si hubo cambio |
 | `simular_fila(llegadas, frecuencia, capacidad)` | `{pasajeros, buses, espera_promedio, espera_maxima, ultima_salida, buses_llenos}` |
 

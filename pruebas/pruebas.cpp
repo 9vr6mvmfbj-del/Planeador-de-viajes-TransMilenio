@@ -90,8 +90,17 @@ static void pruebasBasicas() {
     CHECK(v.encontrado && v.paradas == 2 && v.tramos.size() == 2 && v.transbordo() == "C");
     v = red.viaje("D", "A");  // no hay forma de volver
     CHECK(!v.encontrado);
-    v = red.viaje("A", "A");
-    CHECK(v.encontrado && v.paradas == 0);
+    v = red.viaje("A", "A");  // de una estación a ella misma: no hay viaje (None)
+    CHECK(!v.encontrado && v.tramos.empty());
+    v = red.viaje("A", "NADA");  // estación que no existe
+    CHECK(!v.encontrado);
+    v = red.viaje("NADA", "A");
+    CHECK(!v.encontrado);
+    v = red.viaje("A", "D");  // contrato: lista de (ruta, sube_en, baja_en)
+    CHECK(v.tramos.size() == 1 && v.tramos[0].ruta == "R1" && v.tramos[0].sube == "A" && v.tramos[0].baja == "D");
+    v = red.viaje("X", "D");
+    CHECK(v.tramos.size() == 2 && v.tramos[0].ruta == "R2" && v.tramos[0].sube == "X" && v.tramos[0].baja == "C" &&
+          v.tramos[1].ruta == "R1" && v.tramos[1].sube == "C" && v.tramos[1].baja == "D");
     // R6 (A: 3 buses; C: 3 (R1 06:10 + R2 07:00 y 01:10); E: 1; D: 2; B: 1; X: 1)
     CHECK(nombresDe(red.ranking(2)) == V({"A", "C"}));
     CHECK(red.ranking(0).empty());

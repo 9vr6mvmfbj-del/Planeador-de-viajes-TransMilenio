@@ -470,7 +470,7 @@ Viaje Red::viaje(const std::string& origen, const std::string& destino) const {
     Viaje v;
     int eo = idEstacion(normalizar(origen)), ed = idEstacion(normalizar(destino));
     if (eo < 0 || ed < 0 || !estaciones_[eo].abierta || !estaciones_[ed].abierta) return v;
-    if (eo == ed) { v.encontrado = true; return v; }
+    if (eo == ed) return v;  // ir de una estación a ella misma no es un viaje: None
 
     size_t n = estaciones_.size();
     if (marca_.size() < n) {

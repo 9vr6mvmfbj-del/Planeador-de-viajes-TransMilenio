@@ -46,7 +46,8 @@ struct Tramo {
     int paradas;  // paradas recorridas en este tramo
 };
 
-// Resultado de R5.
+// Resultado de R5. encontrado = false equivale a None; si no, 'tramos' es la lista de
+// (ruta, sube_en, baja_en): 1 tramo si es directo, 2 si hay transbordo.
 struct Viaje {
     bool encontrado = false;
     int paradas = 0;           // total de paradas recorridas
