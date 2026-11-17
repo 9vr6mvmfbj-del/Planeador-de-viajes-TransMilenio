@@ -223,7 +223,7 @@
   .hora-campo { width: auto; min-height: 38px; }
   .hora-campo.destello { animation: destello 2s ease-out both; }
   @keyframes destello {
-    0%, 55% { background: color-mix(in srgb, var(--rojo) 26%, var(--vidrio-fuerte)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rojo) 70%, transparent), 0 0 26px color-mix(in srgb, var(--rojo) 55%, transparent); }
+    0%, 60% { background: color-mix(in srgb, #ff2d46 30%, var(--vidrio-fuerte)); box-shadow: 0 0 0 3px #ff5468, 0 0 0 6px rgba(255, 84, 104, 0.35), 0 0 30px 4px rgba(255, 60, 85, 0.85); }
     100% { box-shadow: 0 0 0 0 transparent, 0 0 0 transparent; }
   }
   @media (prefers-reduced-motion: reduce) { .hora-campo.destello { animation-duration: 2s; animation-timing-function: step-end; } }

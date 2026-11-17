@@ -23,6 +23,8 @@
   let error = $state('');
   let seleccion = $state(0);
   let entrada = $state(/** @type {HTMLInputElement | undefined} */ (undefined));
+  let tarjeta = $state(/** @type {HTMLElement | undefined} */ (undefined));
+  let yaToco = $state(false); // la pista "toca una operación" se quita cuando ya se usó
 
   function lanzar(mensaje) {
     midiendo = true; error = ''; progreso = 'Preparando…';
@@ -32,7 +34,11 @@
       if (d.progreso) progreso = d.progreso;
       if (d.red) redes = [...redes, d.red];
       if (d.error) { error = d.error; }
-      if (d.fin || d.error) { midiendo = false; progreso = ''; w.terminate(); }
+      if (d.fin || d.error) {
+        midiendo = false; progreso = ''; w.terminate();
+        // al terminar, la pantalla baja sola hasta la tarjeta de la operación (R1 estado)
+        if (d.fin) { seleccion = 0; setTimeout(() => tarjeta?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 260); }
+      }
     };
     w.postMessage({ wasm: new URL(import.meta.env.BASE_URL + 'motor_boff.wasm', location.href).href, ...mensaje });
   }
@@ -76,13 +82,12 @@
   });
   let op = $derived(ops[Math.min(seleccion, ops.length - 1)]);
 
-  const PEND = { constante: 0, log: 0.1, lineal: 1, nlogn: 1.1 };
   function explicacion(o) {
     if (!o.mide) return 'R5 no se mide en la prueba del profesor; se muestra como referencia.';
     if (o.ok === null) return 'Con una sola red no hay pendiente: agrega otra red del mismo formato.';
-    if (o.ok) return `La pendiente ${o.pend.toFixed(2)} cae dentro de lo esperado para ${CLASES[o.clase].texto}.`;
+    if (o.ok) return `La pendiente ${o.pend.toFixed(2)} corresponde a ${CLASES[o.clase].texto}.`;
     if (o.clase === 'constante' || o.clase === 'log') {
-      return `La pendiente ${o.pend.toFixed(2)} es mayor que la teórica (${PEND[o.clase]}). No es el algoritmo: el número de pasos es el mismo, pero el C++ es tan rápido (decenas de nanosegundos) que se nota la memoria caché: con redes grandes las tablas y los árboles ya no caben en la caché del procesador y cada acceso al azar tarda más.`;
+      return `La pendiente ${o.pend.toFixed(2)} no es del algoritmo: el número de pasos es el mismo, pero el C++ es tan rápido (decenas de nanosegundos) que se nota la memoria caché: con redes grandes las tablas y los árboles ya no caben en la caché del procesador y cada acceso al azar tarda más.`;
     }
     return `La pendiente ${o.pend.toFixed(2)} se sale de ${CLASES[o.clase].texto}. Revisa que las redes tengan el mismo formato y que no haya otro proceso usando el procesador durante la medición.`;
   }
@@ -121,13 +126,12 @@
     0 = constante, 1 = lineal. R10 se mide con P = 10 × n pasajeros.
     <span class="fuente">{fuente === 'nativo' ? 'Medición nativa (C++, make rendimiento).' : fuente === 'dispositivo' ? 'Medido en este dispositivo (WebAssembly).' : 'Medido con tus archivos CSV (WebAssembly).'}</span>
   </p>
-  {#if progreso}<p class="pequeno tenue" aria-live="polite">{progreso}</p>{/if}
   {#if error}<p class="pequeno error">{error}</p>{/if}
 </header>
 
 {#if op}
 <div class="grilla">
-  <section class="vidrio tarjeta">
+  <section class="vidrio tarjeta ancla" bind:this={tarjeta}>
     <div class="cabeza-tarjeta">
       <div>
         <p class="etiqueta">{op.esperado}</p>
@@ -163,33 +167,88 @@
         </div>
       {/each}
     </div>
-    <p class="pendiente num">Pendiente <strong>{ns.length > 1 ? op.pend.toFixed(2) : '—'}</strong> <span class="tenue">· esperada ≈ {PEND[op.clase]}</span></p>
+    <p class="pendiente num">Pendiente <strong>{ns.length > 1 ? op.pend.toFixed(2) : '—'}</strong></p>
     <p class="mini tenue nota">{explicacion(op)}</p>
   </section>
 
   <section class="vidrio tarjeta">
-    <p class="etiqueta">Todas las operaciones</p>
+    <div class="cabeza-ops">
+      <p class="etiqueta">Todas las operaciones</p>
+      <span class="pista-toque" class:usada={yaToco}><span class="dedo" aria-hidden="true"></span>Toca una para ver su gráfica</span>
+    </div>
     <ul class="operaciones">
       {#each ops as o, i (o.nombre)}
         <li>
-          <button class="fila-op" aria-pressed={i === seleccion} onclick={() => (seleccion = i)}>
+          <button class="fila-op" aria-pressed={i === seleccion} onclick={() => { seleccion = i; yaToco = true; if (matchMedia('(max-width: 979px)').matches) tarjeta?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
             <span class="info-op">
               <span class="nombre-op">{o.nombre}</span>
               <span class="mini tenue">{o.esperado} · {o.mide ? CLASES[o.clase].texto : 'referencia'}</span>
             </span>
             <span class="num factor" class:ok={o.ok}>{ns.length > 1 ? o.pend.toFixed(2) : '—'}</span>
+            <span class="ir" aria-hidden="true"><Icono nombre="flecha" tam={16} /></span>
           </button>
         </li>
       {/each}
     </ul>
-    <p class="mini tenue nota">El número de la derecha es la pendiente log-log: cerca de 0 es O(1) u O(log n); cerca de 1 es O(n).</p>
+    <p class="mini tenue nota">Cada fila es un botón: tócala y arriba cambian la gráfica y los tiempos. El número de la derecha es la pendiente log-log.</p>
   </section>
 </div>
+{/if}
+
+{#if midiendo}
+  <div class="capa-midiendo" role="status" aria-live="polite">
+    <div class="ventana vidrio vidrio-flotante">
+      <div class="orbe" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+      <p class="titulo">Midiendo…</p>
+      <p class="pequeno tenue">{progreso || 'Preparando…'}</p>
+      <p class="mini tenue num">{redes.length} de {fuente === 'dispositivo' ? 4 : redes.length + 1} redes listas</p>
+    </div>
+  </div>
 {/if}
 
 <Contrato />
 
 <style>
+  .ancla { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 16px); }
+  .cabeza-ops { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .pista-toque {
+    display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 8px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; color: var(--rojo); background: var(--rojo-suave);
+    transition: opacity 400ms ease;
+  }
+  .pista-toque.usada { opacity: 0.55; }
+  .dedo { position: relative; width: 14px; height: 14px; border-radius: 50%; background: var(--rojo); }
+  .dedo::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--rojo); animation: onda 1.5s ease-out infinite; }
+  .pista-toque.usada .dedo::after { animation: none; opacity: 0; }
+  @keyframes onda { from { transform: scale(0.5); opacity: 0.9; } to { transform: scale(1.5); opacity: 0; } }
+  .ir { display: flex; color: var(--tenue-2); margin-left: 2px; transition: transform 200ms ease, color 200ms ease; }
+  .fila-op[aria-pressed='true'] .ir { color: var(--rojo); transform: translateX(2px); }
+  .fila-op:active { transform: scale(0.985); }
+
+  /* ventana de "Midiendo…": fondo borroso y un orbe que gira mientras el motor trabaja */
+  .capa-midiendo {
+    position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px;
+    background: color-mix(in srgb, var(--fondo) 38%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2);
+    animation: capa-entra 260ms ease both;
+  }
+  .ventana {
+    display: grid; justify-items: center; gap: 8px; text-align: center;
+    width: min(320px, 100%); padding: 30px 24px 24px; border-radius: 30px; background: var(--vidrio-fuerte);
+    animation: ventana-entra 420ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+  }
+  .orbe { position: relative; width: 112px; height: 112px; margin-bottom: 10px; }
+  .orbe i, .orbe b { position: absolute; inset: 0; border-radius: 50%; }
+  .orbe i:nth-child(1) { background: conic-gradient(from 0deg, #ff2d46, #ffb020, #12d6b6, #2f7dff, #b14dff, #ff2d46); filter: blur(10px); opacity: 0.9; animation: orbe-gira 2.6s linear infinite; }
+  .orbe i:nth-child(2) { inset: 8px; background: conic-gradient(from 180deg, #2f7dff, #ff2d46, #ffb020, #2f7dff); filter: blur(5px); animation: orbe-gira 1.7s linear infinite reverse; }
+  .orbe i:nth-child(3) { inset: 18px; background: radial-gradient(circle at 34% 30%, #ffffff, #ffd9de 26%, #ff3b55 62%, #7a0b2a 100%); box-shadow: inset 0 -8px 18px rgba(0, 0, 0, 0.28), 0 0 26px rgba(255, 60, 85, 0.6); animation: orbe-late 1.5s ease-in-out infinite; }
+  .orbe b { inset: 26px 40px 58px 30px; background: radial-gradient(closest-side, rgba(255, 255, 255, 0.9), transparent); filter: blur(2px); animation: orbe-late 1.5s ease-in-out infinite; }
+  @keyframes orbe-gira { to { transform: rotate(360deg); } }
+  @keyframes orbe-late { 50% { transform: scale(1.07); } }
+  @keyframes capa-entra { from { opacity: 0; } }
+  @keyframes ventana-entra { from { opacity: 0; transform: scale(0.86) translateY(10px); } }
+  @media (prefers-reduced-motion: reduce) { .orbe i, .orbe b, .dedo::after { animation-duration: 6s; } .ventana { animation: none; } }
+
   .cabeza { padding: 8px 4px 18px; display: grid; gap: 10px; }
   .fila-titulo { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .intro { max-width: 70ch; }

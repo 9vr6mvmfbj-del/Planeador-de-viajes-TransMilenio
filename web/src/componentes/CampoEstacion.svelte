@@ -22,7 +22,7 @@
   /** @type {HTMLInputElement | undefined} */
   let entrada = $state();
 
-  const MAX = 8;
+  const MAX = 400; // la lista trae todas las estaciones (se desliza); el tope solo protege con redes gigantes
   // Todas las estaciones abiertas (R3 en orden) y las cerradas, para buscar por palabra.
   let abiertas = $derived.by(() => { app.version; return motor().rango('', '~'); });
 
@@ -40,8 +40,8 @@
       }
     }
     if (!incluirCerradas) return lista;
-    const cerradas = buscar(motor().cerradas(), t, 4).map((n) => ({ n, cerrada: true }));
-    return [...cerradas, ...lista].slice(0, MAX + 1);
+    const cerradas = buscar(motor().cerradas(), t, 50).map((n) => ({ n, cerrada: true }));
+    return [...cerradas, ...lista];
   });
   $effect(() => { if (autofoco) entrada?.focus(); });
   let exacta = $derived(sugerencias.some((s) => s.n === consulta));

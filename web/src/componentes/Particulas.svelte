@@ -5,19 +5,19 @@
   //  · Avanza sola desde que se abre. Se puede mover con el dedo: arrastrando el mango de la línea de
   //    tiempo o la escena.
   //  · Al soltar conserva el impulso del gesto (inercia que frena sola) y enseguida sigue sola,
-  //    acelerando suave (1 minuto simulado ≈ 0,25 s).
+  //    acelerando suave (1 minuto simulado ≈ 0,9 s).
   //  · La simulación ilustrativa es determinista: ir atrás o adelante a la misma hora da lo mismo.
   import { onMount } from 'svelte';
-  import Numero from './Numero.svelte';
   let { llegadas, duracion, frecuencia, capacidad, pasajeros } = $props();
 
   const INICIO_MIN = 5 * 60; // 05:00
   const reducido = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // cada punto ≈ k pasajeros: un bus se lleva unos pocos puntos y nunca hay más de ~3.000 en pantalla
-  let k = $derived(Math.max(1, Math.ceil(pasajeros / 3000), Math.min(Math.ceil(pasajeros / 700), Math.floor(capacidad / 3))));
+  // (tope de ~1.400 puntos: con 800.000 pasajeros el celular sigue dibujando fluido)
+  let k = $derived(Math.max(1, Math.ceil(pasajeros / 1400), Math.min(Math.ceil(pasajeros / 700), Math.floor(capacidad / 3))));
   let porMinuto = $derived.by(() => { const c = new Float32Array(duracion + 1); for (let i = 0; i < llegadas.length; i++) c[Math.min(duracion, Math.floor(llegadas[i] / 60))]++; return c; }); // llegadas viene en segundos
-  let segundos = $derived(Math.min(60, Math.max(24, duracion * 0.25))); // lo que dura la hora pico en pantalla
+  let segundos = $derived(Math.min(240, Math.max(60, duracion * 0.9))); // lo que dura la hora pico en pantalla (≈ 1 s por minuto: da tiempo de leer)
   let minPorSeg = $derived(duracion / segundos);
 
   // ------------------------------------------------------------ simulación ilustrativa (por minuto)
@@ -168,10 +168,11 @@
   let caja = $state(/** @type {HTMLElement | null} */ (null));
   let alto = 190;
   const TONOS = 10;
+  const RADIO = 3.3;
   const colores = Array.from({ length: TONOS }, (_, i) => {
     const u = i / (TONOS - 1);
     const h = u < 0.5 ? 212 + u * 2 * 68 : 280 + (u - 0.5) * 2 * 80; // azul → violeta → rojo
-    return `hsl(${h % 360} 82% ${58 - u * 6}%)`;
+    return `hsl(${h % 360} 100% ${68 - u * 6}%)`; // vivos: se ven sobre el vidrio claro y el oscuro
   });
 
   function dibujar(g, w, h, dt, animar) {
@@ -202,9 +203,9 @@
 
     if (!sim) return;
     // fila: los primeros en llegar, pegados al andén; cuadrícula de abajo hacia atrás
-    const filas = Math.max(8, Math.floor((h - 24) / 7));
+    const filas = Math.max(8, Math.floor((h - 24) / 8));
     const cols = Math.max(1, Math.ceil(sim.fila.length / filas));
-    const sep = Math.min(7, (xAnden - 16) / cols);
+    const sep = Math.min(8, (xAnden - 16) / cols);
     const a = animar ? 1 - Math.pow(0.0006, dt) : 1;
     const max = Math.max(8, frecuencia * 6);
     const cubetas = colores.map(() => []);
@@ -221,7 +222,7 @@
       if (!cubetas[c].length) continue;
       g.fillStyle = colores[c];
       g.beginPath();
-      for (const p of cubetas[c]) { g.moveTo(p.x + 2.6, p.yy); g.arc(p.x, p.yy, 2.6, 0, 6.2832); }
+      for (const p of cubetas[c]) { g.moveTo(p.x + RADIO, p.yy); g.arc(p.x, p.yy, RADIO, 0, 6.2832); }
       g.fill();
     }
     // los que suben: vuelan a la puerta y se desvanecen
@@ -234,7 +235,7 @@
       const x = p.x + (puertaX - p.x) * e, y = p.yy + (puertaY - p.yy) * e;
       g.globalAlpha = 1 - p.t;
       g.fillStyle = colores[Math.min(TONOS - 1, Math.floor(Math.max(0, p.espera) / max * (TONOS - 1)))];
-      g.beginPath(); g.arc(x, y, 2.6, 0, 6.2832); g.fill();
+      g.beginPath(); g.arc(x, y, RADIO, 0, 6.2832); g.fill();
     }
     g.globalAlpha = 1;
   }
@@ -285,7 +286,12 @@
         mango.style.transform = `translate3d(${((Math.min(t, fin) / Math.max(1, fin)) * ancho + desborde).toFixed(2)}px,0,0) scale(${dedo ? 1.15 : 1})`;
       }
       dibujar(g, w, h, dt, animar || modo === 'arrastre');
-      if (ahora - ultimoConteo > 150) { ultimoConteo = ahora; enFila = Math.round(sim.fila.length * k); }
+      // el número sigue a la fila de forma suave (no salta de golpe ni se queda pegado)
+      if (ahora - ultimoConteo > 120) {
+        ultimoConteo = ahora;
+        const real = sim.fila.length * k;
+        enFila = Math.abs(real - enFila) < Math.max(1, k) ? real : Math.round(enFila + (real - enFila) * 0.45);
+      }
     };
     raf = requestAnimationFrame(bucle);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); };
@@ -297,7 +303,7 @@
     <p class="etiqueta">La fila, en vivo</p>
     <span class="datos">
       <span class="chip num reloj">{reloj}</span>
-      <span class="esperando"><strong class="num"><Numero valor={enFila.toLocaleString('es-CO')} /></strong> <span class="mini tenue">esperando</span></span>
+      <span class="esperando"><strong class="num">{enFila.toLocaleString('es-CO')}</strong> <span class="mini tenue">esperando</span></span>
     </span>
   </div>
 

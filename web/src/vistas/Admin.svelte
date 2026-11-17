@@ -457,8 +457,8 @@
 {/if}
 
 <style>
-  .pin-visible { margin-top: 6px; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; text-align: center; }
-  .pin-visible strong { display: block; font-size: 56px; font-weight: 800; letter-spacing: 0.08em; color: var(--rojo); }
+  .pin-visible { margin-top: 6px; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; text-align: center; }
+  .pin-visible strong { display: block; font-size: 36px; font-weight: 800; letter-spacing: 0.08em; color: var(--rojo); }
 
   .cabeza { padding: 8px 4px 18px; }
   .fila-titulo { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
