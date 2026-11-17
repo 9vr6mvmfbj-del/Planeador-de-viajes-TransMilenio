@@ -140,16 +140,41 @@ EXPORTAR const char* m_horarios(const char* e, const char* r) { return devolver(
 EXPORTAR const char* m_rutas() { return devolver(lista(red->nombres_rutas())); }
 EXPORTAR const char* m_cerradas() { return devolver(lista(red->estaciones_cerradas())); }
 
-// R10: 'llegadas' es un arreglo de enteros de 32 bits escrito por JavaScript en la memoria.
-EXPORTAR const char* m_simular_fila(const int* llegadas, int n, int frecuencia, int capacidad) {
+// R10: 'llegadas' es un arreglo de enteros de 32 bits (segundos) escrito por JavaScript en la memoria.
+static std::vector<long long> leerLlegadas(const int* llegadas, int n) {
     std::vector<long long> v(n);
     for (int i = 0; i < n; i++) v[i] = llegadas[i];
-    ResultadoFila r = simular_fila(v, frecuencia, capacidad);
-    std::string s = "{\"pasajeros\":" + std::to_string(r.pasajeros) + ",\"buses\":" + std::to_string(r.buses) +
-                    ",\"esperaPromedio\":" + std::to_string(r.espera_promedio) +
-                    ",\"esperaMaxima\":" + std::to_string(r.espera_maxima) +
-                    ",\"ultimaSalida\":" + std::to_string(r.ultima_salida) +
-                    ",\"busesLlenos\":" + std::to_string(r.buses_llenos) + "}";
+    return v;
+}
+// Contrato: lista con el segundo de salida de cada pasajero, en el mismo orden de las llegadas.
+EXPORTAR const char* m_simular_fila(const int* llegadas, int n, int frecuencia, int capacidad) {
+    std::vector<long long> sal = simular_fila(leerLlegadas(llegadas, n), frecuencia, capacidad);
+    std::string s = "[";
+    for (size_t i = 0; i < sal.size(); i++) { if (i) s += ","; s += std::to_string(sal[i]); }
+    return devolver(s + "]");
+}
+// Solo para la pantalla: resumen de la misma simulación (no es parte del contrato ni de motor/).
+EXPORTAR const char* m_resumen_fila(const int* llegadas, int n, int frecuencia, int capacidad) {
+    std::vector<long long> lleg = leerLlegadas(llegadas, n);
+    std::vector<long long> sal = simular_fila(lleg, frecuencia, capacidad);
+    long long suma = 0, maxEspera = 0, ultima = 0, buses = 0, llenos = 0;
+    long long maxBus = 0;
+    for (long long x : sal) if (x / frecuencia > maxBus) maxBus = x / frecuencia;
+    std::vector<int> abordaron(sal.empty() ? 0 : maxBus + 1, 0);  // pasajeros por bus (bus k sale en k*f)
+    for (size_t i = 0; i < sal.size(); i++) {
+        long long e = sal[i] - lleg[i];
+        suma += e;
+        if (e > maxEspera) maxEspera = e;
+        if (sal[i] > ultima) ultima = sal[i];
+        abordaron[sal[i] / frecuencia]++;
+    }
+    for (int c : abordaron) { if (c > 0) buses++; if (c == capacidad) llenos++; }
+    double promedio = sal.empty() ? 0.0 : static_cast<double>(suma) / static_cast<double>(sal.size());
+    std::string s = "{\"pasajeros\":" + std::to_string(sal.size()) + ",\"buses\":" + std::to_string(buses) +
+                    ",\"esperaPromedio\":" + std::to_string(promedio) +
+                    ",\"esperaMaxima\":" + std::to_string(maxEspera) +
+                    ",\"ultimaSalida\":" + std::to_string(ultima) +
+                    ",\"busesLlenos\":" + std::to_string(llenos) + "}";
     return devolver(s);
 }
 

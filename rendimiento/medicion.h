@@ -103,7 +103,7 @@ inline Resultado medirCrecimiento(const std::vector<int>& escalas, int Q = 50000
             long long P = 100000LL * esc;  // en R10, n = pasajeros
             std::vector<long long> llegadas(P);
             for (long long i = 0; i < P; i++) llegadas[i] = i / 40;
-            ops[k++].tiempos.push_back(medir(1, reps > 3 ? 3 : reps, [&](int) { sumidero += simular_fila(llegadas, 4, 150).buses; }));
+            ops[k++].tiempos.push_back(medir(1, reps > 3 ? 3 : reps, [&](int) { sumidero += simular_fila(llegadas, 4, 150).size(); }));
         }
     }
 

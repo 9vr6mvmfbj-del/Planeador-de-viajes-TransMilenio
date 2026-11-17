@@ -417,21 +417,29 @@ static void pruebasAdmin() {
 
 static void pruebasFila() {
     std::printf("Fila de abordaje\n");
-    ResultadoFila r = simular_fila({0, 0, 1, 2, 3, 10, 10, 10}, 5, 2);
-    CHECK(r.pasajeros == 8 && r.buses == 4 && r.espera_maxima == 7 && r.espera_promedio == 3.0);
-    r = simular_fila({10, 0, 0, 3, 2, 1, 10, 10}, 5, 2);  // desordenadas: mismo resultado
-    CHECK(r.pasajeros == 8 && r.buses == 4 && r.espera_maxima == 7 && r.espera_promedio == 3.0);
-    r = simular_fila({}, 5, 2);
-    CHECK(r.pasajeros == 0 && r.buses == 0);
-    r = simular_fila({1, 2}, 0, 2);
-    CHECK(r.buses == 0);
-    r = simular_fila({1000000}, 7, 1);  // salta directo al bus útil
-    CHECK(r.buses == 1 && r.ultima_salida == 1000006 && r.espera_maxima == 6);
-    vector<long long> muchos(300000);
-    for (size_t i = 0; i < muchos.size(); i++) muchos[i] = static_cast<long long>(i / 50);  // 50 por minuto
-    r = simular_fila(muchos, 3, 150);  // llegan 150 cada 3 min y cabe 150: nadie se queda
-    // el bus del minuto 0 lleva 50 y el último (minuto 6000) lleva 100; los demás salen llenos
-    CHECK(r.pasajeros == 300000 && r.buses == 2001 && r.buses_llenos == 1999 && r.espera_maxima == 2);
+    using L = vector<long long>;
+    // Ejemplo del enunciado: los dos que llegan en el segundo 5 suben al bus de 60; el de 30 y el de 70, al de 120.
+    CHECK(simular_fila({30, 5, 5, 70}, 60, 2) == L({120, 60, 60, 120}));
+    CHECK(simular_fila({}, 60, 2).empty());
+    CHECK(simular_fila({1, 2}, 0, 2).empty());   // sin frecuencia nadie sale
+    CHECK(simular_fila({1, 2}, 60, 0).empty());  // sin cupo nadie sube
+    CHECK(simular_fila({60}, 60, 1) == L({60}));   // llega justo al segundo de salida: alcanza
+    CHECK(simular_fila({61}, 60, 1) == L({120}));  // un segundo tarde: espera al siguiente
+    CHECK(simular_fila({0}, 60, 1) == L({60}));    // el primer bus sale en f, no en 0
+    CHECK(simular_fila({5, 5, 5}, 60, 2) == L({60, 60, 120}));  // el empate sube en el orden de la lista
+    CHECK(simular_fila({1000000}, 7, 1) == L({1000006}));       // salta directo al bus útil
+    CHECK(simular_fila({10, 10, 10, 10, 10}, 10, 2) == L({10, 10, 20, 20, 30}));  // se acumulan y salen llenos
+    // desordenadas: la respuesta viene en el mismo orden de la entrada
+    CHECK(simular_fila({70, 5, 30, 5}, 60, 2) == L({120, 60, 120, 60}));
+    vector<long long> muchos(800000);
+    for (size_t i = 0; i < muchos.size(); i++) muchos[i] = static_cast<long long>(i / 50);  // 50 por segundo
+    L s = simular_fila(muchos, 3, 150);  // llegan 150 cada 3 s y cabe 150: nadie se queda
+    CHECK(s.size() == muchos.size() && s[0] == 3 && s[149] == 3 && s[150] == 6 && s[799999] == 16002);
+    for (size_t i = 0; i < muchos.size(); i += 7919) CHECK(s[i] >= muchos[i] && s[i] - muchos[i] < 3 + 3);
+    // al revés (de mayor a menor llegada) y mezcladas con la fila hecha a mano
+    vector<long long> inv(muchos.rbegin(), muchos.rend());
+    L si = simular_fila(inv, 3, 150);
+    for (size_t i = 0; i < inv.size(); i += 7919) CHECK(si[i] == s[inv.size() - 1 - i]);
 }
 
 // R5 contra fuerza bruta en la red real: el mejor viaje encontrado debe ser óptimo.

@@ -81,6 +81,18 @@ export async function cargarMotor(origen) {
     }
   }
 
+  // Escribe las llegadas (enteros de 32 bits) en la memoria del motor y llama a la función.
+  function conLlegadas(fn, llegadas, frecuencia, capacidad) {
+    const n = llegadas.length;
+    const p = m.malloc(Math.max(1, n) * 4);
+    new Int32Array(memoria.buffer, p, n).set(llegadas);
+    try {
+      return leer(fn(p, n, frecuencia, capacidad));
+    } finally {
+      m.free(p);
+    }
+  }
+
   return {
     cargar: (estaciones, rutas, horarios) => llamar(m.m_cargar, estaciones, rutas, horarios),
     resumen: () => leer(m.m_resumen()),
@@ -101,16 +113,10 @@ export async function cargarMotor(origen) {
     rehacer: () => leer(m.m_rehacer()),
 
     // ---- R10: función suelta ----
-    simular_fila(llegadas, frecuencia, capacidad) {
-      const n = llegadas.length;
-      const p = m.malloc(Math.max(1, n) * 4);
-      new Int32Array(memoria.buffer, p, n).set(llegadas);
-      try {
-        return leer(m.m_simular_fila(p, n, frecuencia, capacidad));
-      } finally {
-        m.free(p);
-      }
-    },
+    // llegadas y frecuencia en segundos; devuelve el segundo de salida de cada pasajero (mismo orden).
+    simular_fila(llegadas, frecuencia, capacidad) { return conLlegadas(m.m_simular_fila, llegadas, frecuencia, capacidad); },
+    // Solo para la pantalla de la fila: resumen de la misma simulación (segundos).
+    resumen_fila(llegadas, frecuencia, capacidad) { return conLlegadas(m.m_resumen_fila, llegadas, frecuencia, capacidad); },
 
     // ---- extras para la app ----
     estacion: (nombre) => llamar(m.m_estacion, nombre),

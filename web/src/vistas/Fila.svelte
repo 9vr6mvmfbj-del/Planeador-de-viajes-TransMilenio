@@ -17,7 +17,8 @@
   $effect(() => { capacidad = tipoBus; });
   const INICIO = '05:00';
 
-  // Minuto de llegada de cada pasajero, ya en orden (cuantiles de la distribución elegida).
+  // Segundo de llegada de cada pasajero, ya en orden (cuantiles de la distribución elegida).
+  // El motor trabaja en segundos (contrato de R10); la pantalla muestra minutos.
   let llegadas = $derived.by(() => {
     const P = pasajeros, D = duracion;
     const v = new Int32Array(P);
@@ -31,7 +32,7 @@
         const tt = mitad < 0.5 ? Math.sqrt(mitad / 2) : 1 - Math.sqrt((1 - mitad) / 2);
         t = (u < 0.5 ? tt : 1 + tt) * D / 2;
       }
-      v[i] = Math.min(D - 1, Math.floor(t));
+      v[i] = Math.min(D * 60 - 1, Math.floor(t * 60));
     }
     return v;
   });
@@ -42,7 +43,8 @@
   function simular() {
     vibrar();
     const t = performance.now();
-    resultado = motor().simular_fila(llegadas, frecuencia, capacidad);
+    const r = motor().resumen_fila(llegadas, frecuencia * 60, capacidad);
+    resultado = { ...r, esperaPromedio: r.esperaPromedio / 60, esperaMaxima: Math.round(r.esperaMaxima / 60), ultimaSalida: Math.round(r.ultimaSalida / 60) };
     ms = performance.now() - t;
   }
   $effect(() => { llegadas; frecuencia; capacidad; simular(); });
@@ -50,7 +52,7 @@
   // Histograma de llegadas cada 5 minutos contra lo que alcanzan a llevar los buses.
   let barras = $derived.by(() => {
     const paso = 5, n = Math.ceil(duracion / paso), c = new Array(n).fill(0);
-    for (let i = 0; i < llegadas.length; i++) c[Math.floor(llegadas[i] / paso)]++;
+    for (let i = 0; i < llegadas.length; i++) c[Math.floor(llegadas[i] / 60 / paso)]++;
     return c;
   });
   let cupoPorBloque = $derived((5 / frecuencia) * capacidad);

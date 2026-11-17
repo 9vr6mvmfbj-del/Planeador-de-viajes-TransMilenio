@@ -104,7 +104,7 @@ Estructuras propias en `motor/estructuras/`: `TablaHash` (encadenamiento, factor
 | `proximo_bus(estacion, ruta, hora)` | `"HH:MM"`, o `""` (None) si no hay más ese día |
 | `viaje(origen, destino)` | tramos `(ruta, sube_en, baja_en)`: 1 si es directo, 2 si hay transbordo; `encontrado = false` es None (no hay viaje, estación inexistente o cerrada, o origen = destino) |
 | `agregar_parada`, `quitar_parada`, `cerrar`, `reabrir`, `deshacer`, `rehacer` | `true` si hubo cambio |
-| `simular_fila(llegadas, frecuencia, capacidad)` | `{pasajeros, buses, espera_promedio, espera_maxima, ultima_salida, buses_llenos}` |
+| `simular_fila(llegadas, frecuencia, capacidad)` | lista con el segundo de salida de cada pasajero, en el mismo orden de `llegadas` (todo en segundos; ejemplo del enunciado: `[30,5,5,70], 60, 2` → `[120,60,60,120]`) |
 
 Los nombres se normalizan (espacios de los lados y mayúsculas), así `" ricaurte"` = `"RICAURTE"`.
 
@@ -259,16 +259,21 @@ eliminan líneas. Estas funciones son extras del motor (`crear_estacion`, `elimi
 > Eliminar estaciones y líneas guarda lo necesario para devolverlas a su lugar exacto. Descartamos
 > reconstruir la red sin ese cambio porque cuesta O(n) cada vez y perdería las pilas.
 
-### R10 · Fila de abordaje — Cola FIFO en arreglo circular · O(P)
-Los pasajeros entran a la cola al llegar y los buses (en los minutos 0, f, 2f, …) sacan hasta
-`capacidad`. Si no hay nadie esperando, se salta directo al siguiente bus útil, así el costo no depende
-de las horas simuladas. Cada pasajero entra y sale una vez: **O(P)**. Si las llegadas vienen
-desordenadas se ordenan primero con merge sort (O(P log P)). **Descartado:** quitar el primero de un
-arreglo normal (O(P) cada vez → O(P²) con cientos de miles de pasajeros) y simular minuto a minuto.
+### R10 · Fila de abordaje — Merge sort + cola FIFO en arreglo circular · O(P log P) (O(P) si ya vienen en orden)
+Entra una lista de segundos de llegada (pueden venir desordenadas) y sale, en el mismo orden, el segundo
+en que salió el bus de cada persona. Primero se ordenan las llegadas con merge sort **estable** (guardando
+la posición original de cada pasajero, así el empate sube en el orden de la lista). Después la fila es una
+**cola FIFO sobre arreglo circular**: los pasajeros entran al llegar y los buses (en los segundos f, 2f, 3f…)
+sacan hasta `capacidad`. Quien llega justo en el segundo de salida alcanza a subir. Si no hay nadie
+esperando se salta directo al siguiente bus útil, así el costo no depende de las horas simuladas. Cada
+pasajero entra y sale de la cola una vez: **O(P)** la simulación, más **O(P log P)** el ordenamiento
+(se omite si las llegadas ya vienen ordenadas). **Descartado:** quitar el primero de un arreglo normal
+(O(P) cada vez → O(P²) con cientos de miles de pasajeros) y simular segundo a segundo.
 
-> **README:** R10 usa una cola propia sobre arreglo circular: encolar y desencolar O(1), y como cada
-> pasajero entra y sale una sola vez la simulación es O(P), P = pasajeros. Los buses vacíos se saltan.
-> Descartamos borrar el primero de un arreglo (O(P²) en total) y simular minuto a minuto.
+> **README:** R10 ordena las llegadas con merge sort estable (O(P log P)) y usa una cola propia sobre
+> arreglo circular: encolar y desencolar O(1), y como cada pasajero entra y sale una sola vez la simulación
+> es O(P), P = pasajeros. Los buses vacíos se saltan. Devuelve el segundo de salida de cada pasajero en el
+> orden de entrada. Descartamos borrar el primero de un arreglo (O(P²) en total) y simular segundo a segundo.
 
 ---
 

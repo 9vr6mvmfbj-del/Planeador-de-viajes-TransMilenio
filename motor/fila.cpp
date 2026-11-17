@@ -5,53 +5,50 @@
 
 namespace motor {
 
-ResultadoFila simular_fila(const std::vector<long long>& llegadas, long long frecuencia, long long capacidad) {
-    ResultadoFila res;
-    if (llegadas.empty() || frecuencia <= 0 || capacidad <= 0) return res;
+namespace {
+struct Llegada {
+    long long segundo;
+    int pasajero;  // posición original en 'llegadas'
+};
+}  // namespace
 
-    // Si las llegadas no vienen en orden, se ordena una copia (merge sort, estable).
-    const std::vector<long long>* datos = &llegadas;
-    std::vector<long long> copia;
-    for (size_t i = 1; i < llegadas.size(); i++) {
-        if (llegadas[i] < llegadas[i - 1]) {
-            copia = llegadas;
-            ordenarMezcla(copia, [](long long a, long long b) { return a < b; });
-            datos = &copia;
-            break;
-        }
+std::vector<long long> simular_fila(const std::vector<long long>& llegadas, long long frecuencia, long long capacidad) {
+    std::vector<long long> salidas;
+    if (frecuencia <= 0 || capacidad <= 0) return salidas;
+    int P = static_cast<int>(llegadas.size());
+    salidas.assign(P, 0);
+    if (P == 0) return salidas;
+
+    // 1) Pasajeros en orden de llegada. Merge sort estable: el empate conserva el orden de la lista.
+    std::vector<Llegada> orden(P);
+    bool ordenadas = true;
+    for (int i = 0; i < P; i++) {
+        orden[i] = Llegada{llegadas[i], i};
+        if (i > 0 && llegadas[i] < llegadas[i - 1]) ordenadas = false;
     }
-    const std::vector<long long>& L = *datos;
-    long long P = static_cast<long long>(L.size());
+    if (!ordenadas) ordenarMezcla(orden, [](const Llegada& a, const Llegada& b) { return a.segundo < b.segundo; });
 
-    Cola<long long> fila(1024);
-    long long siguiente = 0;  // próximo pasajero por llegar
-    long long salida = 0;     // minuto del próximo bus
-    long long sumaEspera = 0;
-
+    // 2) La fila es una cola FIFO: los pasajeros entran al llegar y cada bus saca hasta 'capacidad'.
+    Cola<int> fila(1024);
+    int siguiente = 0;           // próximo pasajero por llegar
+    long long bus = frecuencia;  // segundo del próximo bus: f, 2f, 3f, ...
     while (siguiente < P || !fila.vacia()) {
         if (fila.vacia()) {
-            // Nadie esperando: saltar al primer bus en o después de la próxima llegada.
-            long long t = L[siguiente];
-            long long bus = (t >= 0 ? (t + frecuencia - 1) / frecuencia : -((-t) / frecuencia)) * frecuencia;
-            if (bus > salida) salida = bus;
+            // Nadie esperando: saltar al primer bus que sale en o después de la próxima llegada.
+            long long t = orden[siguiente].segundo;
+            long long k = t <= 0 ? 1 : (t + frecuencia - 1) / frecuencia;
+            if (k * frecuencia > bus) bus = k * frecuencia;
         }
-        while (siguiente < P && L[siguiente] <= salida) fila.encolar(L[siguiente++]);
+        while (siguiente < P && orden[siguiente].segundo <= bus) fila.encolar(orden[siguiente++].pasajero);
 
         long long cupo = capacidad;
         while (cupo > 0 && !fila.vacia()) {
-            long long espera = salida - fila.desencolar();
-            sumaEspera += espera;
-            if (espera > res.espera_maxima) res.espera_maxima = espera;
+            salidas[fila.desencolar()] = bus;
             cupo--;
         }
-        res.buses++;
-        if (cupo == 0) res.buses_llenos++;
-        res.ultima_salida = salida;
-        salida += frecuencia;
+        bus += frecuencia;
     }
-    res.pasajeros = P;
-    res.espera_promedio = static_cast<double>(sumaEspera) / static_cast<double>(P);
-    return res;
+    return salidas;
 }
 
 }  // namespace motor
