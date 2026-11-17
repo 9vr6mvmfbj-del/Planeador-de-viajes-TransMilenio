@@ -181,7 +181,10 @@ No hay un algoritmo del curso que lo haga tal cual; combinamos lista enlazada + 
 2. Por cada ruta que sale del origen se camina **hacia adelante**. En cada estación marcada se suma
    d₁ + d₂ con una ruta distinta: es un viaje con transbordo.
 
-Se queda el de menos paradas (empate: el directo; luego orden alfabético de rutas). Costo: lo que miden
+Se queda el de menos paradas (empate: el directo; luego orden alfabético de rutas) y se devuelve como lista de
+tramos `(ruta, sube_en, baja_en)`: 1 tramo si es directo, 2 si hay transbordo. Si no hay viaje (estación que no
+existe o cerrada, o ninguna combinación de una o dos rutas llega) devuelve None; ir de una estación a ella misma
+tampoco es un viaje. Costo: lo que miden
 las rutas que pasan por el origen y por el destino (**L_o + L_d**), sin importar el tamaño de la red.
 Las marcas por "ronda" evitan limpiar los arreglos en cada consulta. **Descartado:** probar todas las
 parejas de rutas (O(R² · L²)) o un BFS sobre todo el grafo (no limita a un solo transbordo y recorre
@@ -195,7 +198,8 @@ toda la red). Se verificó contra fuerza bruta en 385 viajes de la red real.
 
 ### R6 · Ranking — Árbol AVL ordenado por buses/día · O(log n + k)
 "Se consulta muy seguido y cambia poco". Un segundo AVL guarda las estaciones abiertas ordenadas por
-(buses desc, nombre asc): la consulta es recorrer los primeros k. Cuando algo cambia (cerrar, reabrir,
+(buses desc, nombre asc): la consulta es recorrer los primeros k y devolver cada uno como
+`(nombre, buses_por_dia)`; el número sale de la misma clave del árbol, sin buscar nada más. Cuando algo cambia (cerrar, reabrir,
 quitar/agregar parada) se saca y se vuelve a meter **solo esa estación**: O(log n).
 **Descartados:** ordenar en cada consulta (O(n log n)); un heap (sacar los k mayores cuesta
 O(k log n) y destruye el heap); un caché ordenado que se recalcula entero en cada cambio (O(n log n)).
